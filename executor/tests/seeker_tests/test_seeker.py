@@ -289,6 +289,7 @@ def test_relative_time():
             ElapsedTimeEntry(0.1),
             # In with in recursive call
             LineEntry("qux()"),
+            LineEntry(source_regex="with snoop:", min_python_version=(3, 10)),
             ElapsedTimeEntry(0.4),
             # Call to bar3 from after with
             VariableEntry("_x", "9"),
@@ -312,6 +313,7 @@ def test_relative_time():
             ElapsedTimeEntry(0.1),
             # In with in first call
             LineEntry("qux()"),
+            LineEntry(source_regex="with snoop:", min_python_version=(3, 10)),
             ElapsedTimeEntry(0.7),
             # Call to bar3 from after with
             VariableEntry("_x", "9"),
@@ -1390,6 +1392,7 @@ def test_with_block():
             ElapsedTimeEntry(),
             # In with in recursive call
             LineEntry("qux()"),
+            LineEntry(source_regex="with snoop:", min_python_version=(3, 10)),
             ElapsedTimeEntry(),
             # Call to bar3 from after with
             VariableEntry("_x", "9"),
@@ -1413,6 +1416,7 @@ def test_with_block():
             ElapsedTimeEntry(),
             # In with in first call
             LineEntry("qux()"),
+            LineEntry(source_regex="with snoop:", min_python_version=(3, 10)),
             ElapsedTimeEntry(),
             # Call to bar3 from after with
             VariableEntry("_x", "9"),
@@ -1477,6 +1481,8 @@ def test_with_block_depth():
             LineEntry(),
             ReturnEntry(),
             ReturnValueEntry("20"),
+            VariableEntry(min_python_version=(3, 10)),
+            LineEntry(source_regex="with seeker.tracer*", min_python_version=(3, 10)),
             ElapsedTimeEntry(),
         ),
     )
@@ -1554,6 +1560,8 @@ def test_cellvars():
             ReturnValueEntry(),
             ReturnEntry(),
             ReturnValueEntry(),
+            VariableEntry(min_python_version=(3, 10)),
+            LineEntry(source_regex="with seeker.tracer*", min_python_version=(3, 10)),
             ElapsedTimeEntry(),
         ),
     )
@@ -1570,15 +1578,7 @@ def test_var_order():
         five, six, seven = 5, 6, 7
 
     with seeker.tracer(
-        "f",
-        "string_io",
-        "one",
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
+        only_watch=False,
         output=string_io,
         depth=2,
     ):
@@ -1611,6 +1611,8 @@ def test_var_order():
             VariableEntry("seven", "7"),
             ReturnEntry(),
             ReturnValueEntry(),
+            VariableEntry("result", "None", min_python_version=(3, 10)),
+            LineEntry(source_regex="with seeker.tracer*", min_python_version=(3, 10)),
             ElapsedTimeEntry(),
         ),
     )
