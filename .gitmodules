@@ -1,3 +1,0 @@
-[submodule "executor/networkx"]
-	path = executor/networkx
-	url = https://github.com/FlickerSoul/networkx
