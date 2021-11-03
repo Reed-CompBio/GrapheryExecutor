@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9318eeb12afe62f08de591a45ad2e2e6a2392e25ea20139e1e9f9bb7105abf60"
+            "sha256": "18cced3684481808a6a76c3f398a21b3c601fbbf1fce3843dedd48acbb28d868"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.9"
+            "python_version": "3.10"
         },
         "sources": [
             {
@@ -19,7 +19,7 @@
         "networkg": {
             "editable": true,
             "git": "https://github.com/Reed-CompBio/networkx.git",
-            "ref": "a6ea338fa8aa67d1d58efb8154b605993d028ece"
+            "ref": "75a3728a6162db8d147afbb64b52a973bc9f8754"
         }
     },
     "develop": {
