@@ -17,12 +17,9 @@ from typing import Iterable, Tuple, Any, Mapping, Optional, List, Callable, Unio
 
 from ..utils.recorder import Recorder
 from .variables import CommonVariable, Exploding, BaseVariable
-from . import utils, pycompat
+from . import utils
 
 from io import StringIO
-
-if pycompat.PY2:
-    from io import open
 
 # TODO I don't need ipython related things
 ipython_filename_pattern = re.compile("^<ipython-input-([0-9]+)-.*>$")
@@ -116,7 +113,7 @@ def get_path_and_source_from_frame(frame):
             if match:
                 encoding = match.group(1).decode("ascii")
                 break
-        source = [pycompat.text_type(sline, encoding, "replace") for sline in source]
+        source = [utils.text_type(sline, encoding, "replace") for sline in source]
 
     result = (file_name, source)
     source_and_path_cache[cache_key] = result
@@ -124,7 +121,7 @@ def get_path_and_source_from_frame(frame):
 
 
 def get_write_function(output, overwrite):
-    is_path = isinstance(output, (pycompat.PathLike, str))
+    is_path = isinstance(output, (utils.PathLike, str))
     if overwrite and not is_path:
         raise Exception(
             "`overwrite=True` can only be used when writing " "content to file."
@@ -160,7 +157,7 @@ def get_write_function(output, overwrite):
 
 class FileWriter(object):
     def __init__(self, path, overwrite: bool = True):
-        self.path = pycompat.text_type(path)
+        self.path = utils.text_type(path)
         self.overwrite = overwrite
 
     def write(self, s):
@@ -305,7 +302,7 @@ class Tracer:
         for attr_name, attr in cls.__dict__.items():
             # Coroutines are functions, but snooping them is not supported
             # at the moment
-            if pycompat.iscoroutinefunction(attr):
+            if inspect.iscoroutinefunction(attr):
                 continue
 
             if inspect.isfunction(attr):
@@ -337,9 +334,9 @@ class Tracer:
                 except Exception as e:
                     method, incoming = gen.throw, e
 
-        if pycompat.iscoroutinefunction(function):
+        if inspect.iscoroutinefunction(function):
             raise NotImplementedError
-        if pycompat.isasyncgenfunction(function):
+        if inspect.isasyncgenfunction(function):
             raise NotImplementedError
         elif inspect.isgeneratorfunction(function):
             return generator_wrapper
@@ -378,7 +375,7 @@ class Tracer:
         #                                                                     #
         start_time = self.start_times.pop(calling_frame)
         duration = datetime_module.datetime.now() - start_time
-        elapsed_time_string = pycompat.timedelta_format(duration)
+        elapsed_time_string = utils.timedelta_format(duration)
         indent = " " * 4 * (thread_global.depth + 1)
         self.write(f"{indent}Elapsed time: {elapsed_time_string}")
         #                                                                     #

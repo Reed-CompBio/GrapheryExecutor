@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import datetime
+import os
 import re
 
 from typing import Mapping, Any, Callable, Union, Iterable
@@ -101,3 +103,19 @@ def ensure_tuple(x):
         return tuple(x)
     else:
         return (x,)
+
+
+def timedelta_format(timedelta):
+    time = (datetime.datetime.min + timedelta).time()
+    return datetime.time.isoformat(time, timespec="microseconds")
+
+
+def timedelta_parse(s):
+    hours, minutes, seconds, microseconds = map(int, s.replace(".", ":").split(":"))
+    return datetime.timedelta(
+        hours=hours, minutes=minutes, seconds=seconds, microseconds=microseconds
+    )
+
+
+PathLike = os.PathLike
+text_type = str
