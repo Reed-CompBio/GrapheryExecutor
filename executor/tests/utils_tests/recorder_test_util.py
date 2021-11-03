@@ -3,7 +3,7 @@ from __future__ import annotations
 from pprint import pformat
 from typing import Mapping, List, Union, Optional, Tuple
 
-from bundle.utils.recorder import Recorder
+from executor.utils.recorder import Recorder
 
 
 # noinspection PyProtectedMember

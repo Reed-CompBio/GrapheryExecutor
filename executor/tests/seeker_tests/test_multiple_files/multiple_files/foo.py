@@ -1,7 +1,7 @@
 # Copyright 2019 Ram Rachum and collaborators.
 # This program is distributed under the MIT license.
 
-from bundle import seeker
+from executor import seeker
 
 from .bar import bar_function
 

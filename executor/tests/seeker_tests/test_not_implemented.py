@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from bundle import seeker
-from bundle.seeker import pycompat
+from executor import seeker
+from executor.seeker import pycompat
 
 
 def test_rejecting_coroutine_functions():

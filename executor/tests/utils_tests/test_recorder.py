@@ -8,10 +8,9 @@ from collections.abc import Mapping, Set
 
 import pytest
 
-from bundle.seeker import tracer
-from bundle.GraphObjects.Edge import Edge
-from bundle.GraphObjects.Node import Node
-from bundle.utils.recorder import Recorder, identifier_to_string, IDENTIFIER_SEPARATOR
+from executor.seeker import tracer
+from networkx import Node, Edge
+from executor.utils.recorder import Recorder, identifier_to_string, IDENTIFIER_SEPARATOR
 from .recorder_test_util import RecorderResultParser
 
 

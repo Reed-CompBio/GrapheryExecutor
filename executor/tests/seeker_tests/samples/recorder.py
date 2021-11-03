@@ -1,4 +1,4 @@
-from bundle.seeker import tracer
+from executor.seeker import tracer
 
 
 @tracer()

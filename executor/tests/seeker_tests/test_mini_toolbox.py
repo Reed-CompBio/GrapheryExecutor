@@ -3,7 +3,7 @@
 
 import pytest
 
-from bundle.tests.seeker_tests import mini_toolbox
+from executor.tests.seeker_tests import mini_toolbox
 
 
 def test_output_capturer_doesnt_swallow_exceptions():

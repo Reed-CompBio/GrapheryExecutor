@@ -1,8 +1,8 @@
 # Copyright 2019 Ram Rachum and collaborators.
 # This program is distributed under the MIT license.
 
-from bundle import seeker
-from bundle.seeker.utils import ensure_tuple
+from executor import seeker
+from executor.seeker.utils import ensure_tuple
 
 
 def test_ensure_tuple():

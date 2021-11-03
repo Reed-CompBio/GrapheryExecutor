@@ -1,5 +1,5 @@
 import pytest
-from bundle.controller import _Controller
+from executor.utils.controller import _Controller
 
 
 @pytest.fixture()

@@ -3,16 +3,16 @@ import re
 import abc
 import inspect
 
-from bundle.seeker.utils import DEFAULT_REPR_RE
+from executor.seeker.utils import DEFAULT_REPR_RE
 
 try:
     from itertools import zip_longest
 except ImportError:
     from itertools import izip_longest as zip_longest
 
-from bundle.tests.seeker_tests import mini_toolbox
+from executor.tests.seeker_tests import mini_toolbox
 
-import bundle.seeker.pycompat
+import executor.seeker.pycompat
 
 
 def get_function_arguments(function, exclude=()):
@@ -27,7 +27,7 @@ def get_function_arguments(function, exclude=()):
     return result
 
 
-class _BaseEntry(bundle.seeker.pycompat.ABC):
+class _BaseEntry(executor.seeker.pycompat.ABC):
     def __init__(self, prefix=""):
         self.prefix = prefix
 
@@ -88,7 +88,7 @@ class ElapsedTimeEntry(_BaseEntry):
         match = self.line_pattern.match(s)
         if not match:
             return False
-        timedelta = bundle.seeker.pycompat.timedelta_parse(match.group("time"))
+        timedelta = executor.seeker.pycompat.timedelta_parse(match.group("time"))
         if self.elapsed_time_value:
             return (
                 abs(timedelta.total_seconds() - self.elapsed_time_value)

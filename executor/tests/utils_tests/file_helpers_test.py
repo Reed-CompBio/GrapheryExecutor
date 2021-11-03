@@ -5,7 +5,7 @@ from importlib import import_module
 import textwrap
 
 import pytest
-import bundle.utils.cache_file_helpers as file_helper
+import executor.utils.cache_file_helpers as file_helper
 
 DEFAULT_CACHE_FOLDER = file_helper.USER_DOCS_PATH
 
@@ -133,7 +133,7 @@ def test_write_and_import_temp_file(
         py_file_path = cache_folder.cache_folder_path / ("%s.py" % file_name)
         file_content = textwrap.dedent(
             u"""
-            from bundle.utils.cache_file_helpers import get_md5_of_a_string 
+            from executor.utils.cache_file_helpers import get_md5_of_a_string 
             content = '%s'
             md5_content = get_md5_of_a_string(content)
         """

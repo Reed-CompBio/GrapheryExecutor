@@ -2,8 +2,8 @@
 # Copyright 2019 Ram Rachum and collaborators.
 # This program is distributed under the MIT license.
 
-from bundle import seeker
-from bundle.seeker import pycompat
+from executor import seeker
+from executor.seeker import pycompat
 from .utils import (
     assert_output,
     VariableEntry,

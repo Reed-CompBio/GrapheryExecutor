@@ -7,11 +7,11 @@ import threading
 import time
 import sys
 
-from bundle.seeker.utils import truncate
+from executor.seeker.utils import truncate
 import pytest
 
-from bundle import seeker
-from bundle.seeker.variables import needs_parentheses
+from executor import seeker
+from executor.seeker.variables import needs_parentheses
 from .utils import (
     assert_output,
     assert_sample_output,
@@ -1162,8 +1162,8 @@ def test_unavailable_source():
         # ideas: this is import, you can use the same method to import modules!!!
         content = textwrap.dedent(
             u"""
-            from bundle import seeker
-            from bundle.GraphObjects.Node import Node
+            from executor import seeker
+            from networkx import Node
             node = Node('1')
             @seeker.tracer(only_watch=False)
             def f(x):
