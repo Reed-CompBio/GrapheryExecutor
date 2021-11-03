@@ -37,7 +37,7 @@ def test_chinese():
                 CallEntry(),
                 LineEntry(),
                 VariableEntry("a"),
-                LineEntry(u"x = '失败'"),
+                LineEntry(u'x = "失败"'),
                 VariableEntry(u"x", (u"'失败'" if pycompat.PY3 else None)),
                 LineEntry(),
                 ReturnEntry(),
