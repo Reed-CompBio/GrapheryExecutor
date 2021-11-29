@@ -634,8 +634,12 @@ class GraphController(Controller):
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
 
+        # TODO make new module for sigh
+
         self._update_globals("graph", self._graph)
         self._logger.debug(f"updated graph in user globals with {self._graph}")
+
+    # TODO add option setter such as rand seed
 
     def _graph_runner(self) -> list[MutableMapping]:
         """
