@@ -18,11 +18,12 @@ from typing import (
     Generator,
     Any,
     ParamSpec,
+    MutableMapping,
 )
 from contextlib import redirect_stdout, redirect_stderr
 
 from .logger import void_logger
-from .recorder import Recorder as _recorder_cls
+from ._recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
 from ..settings import DefaultVars, DefaultENVVars
 
@@ -255,7 +256,7 @@ class Controller(Generic[_T]):
             raise Exception(
                 "open() is not supported by Executor. \n"
                 "Instead use io.StringIO() to simulate a file. \n"
-                "Here is an example: http://goo.gl/uNvBGl \n"
+                "Here is an example: https://goo.gl/uNvBGl \n"
                 "If you're using a local instance, please try to turn on is_local_flag \n"
             )
 
@@ -603,15 +604,23 @@ class GraphController(Controller):
     def __init__(
         self,
         *,
+        code: str,
+        graph_data: dict,
+        exec_options: Mapping = None,
+        graph: nx.Graph = None,
         logger: Logger = void_logger,
+        options: Mapping = None,
     ) -> None:
-        super().__init__(
-            runner=self._graph_runner,
-            logger=logger,
-        )
+        super().__init__(runner=self._graph_runner, logger=logger, options=options)
+
+        # collect basic data
+        self._code = code
+        self._graph_data = graph_data
+        self._graph = graph or self._graph_builder(graph_data)
+        self._exec_options = exec_options or {}
 
         # collect recorder and tracer
-        self._recorder = _recorder_cls()
+        self._recorder = _recorder_cls(graph=self._graph, logger=logger)
         self._logger.debug("made new recorder")
 
         self._tracer = deepcopy(_tracer_cls)
@@ -620,37 +629,35 @@ class GraphController(Controller):
 
     def _collect_globals(self) -> None:
         super(GraphController, self)._collect_globals()
+
+        # place trace
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
 
-    def _graph_runner(
-        self, code: str, graph_data: dict, options: Mapping = None
-    ) -> None:
+        self._update_globals("graph", self._graph)
+        self._logger.debug(f"updated graph in user globals with {self._graph}")
+
+    def _graph_runner(self) -> list[MutableMapping]:
         """
         Graphery graph runner
-        :param code: a string of the submitted code
-        :param graph_data: the graph
-        :param options: execution options
-        :return: a list of execution records
+        :return: a list of execution records but None for now
         """
-        graph = self._graph_builder(graph_data)
-
-        # TODO  load redirection to recorder
-        self._update_globals("graph", graph)
-        self._logger.debug(f"updated graph in user globals with {graph}")
-
-        # TODO add load options to recorder
-        # self._recorder.load_options(options)
-        cmd = compile(code, "<graphery_main>", "exec")
+        cmd = compile(self._code, "<graphery_main>", "exec")
 
         with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
             self._restrict_sandbox()
             exec(cmd, self._user_globals, self._user_globals)
+
         self._logger.debug(
             "executed successfully on \n"
             "```python\n"
-            f"{code}\n"
+            f"{self._code}\n"
             "```\n"
             "with globals \n"
-            f"{self._user_globals}"
+            f"{self._user_globals}\n"
         )
+
+        result = self._recorder.final_change_list
+        self._logger.debug("final change list: \n" f"{result}\n")
+
+        return result
