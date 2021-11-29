@@ -46,6 +46,12 @@ _P = ParamSpec("_P")
 
 
 def _builtins_getter(name: str) -> Any:
+    """
+    get builtin fns by name
+    :param name: name of builtin fn
+    :return: the fn
+    :raise: AttributeError if the name is not found
+    """
     if isinstance(__builtins__, Mapping):
         # noinspection PyUnresolvedReferences
         return __builtins__[name]
@@ -55,7 +61,11 @@ def _builtins_getter(name: str) -> Any:
         raise TypeError(f"Unknown __builtins__ type {type(__builtins__)}")
 
 
-def _builtin_iterator() -> Generator[tuple[str, Any], Any, None]:
+def _builtins_iterator() -> Generator[tuple[str, Any], Any, None]:
+    """
+    get an iterator for builtins
+    :return: A generator of (str, Any) type
+    """
     if isinstance(__builtins__, Mapping):
         # noinspection PyUnresolvedReferences
         for k, v in __builtins__.items():
@@ -67,11 +77,16 @@ def _builtin_iterator() -> Generator[tuple[str, Any], Any, None]:
         raise TypeError(f"Unknown __builtins__ type {type(__builtins__)}")
 
 
+# system stdout and stderr
 _ORIGINAL_STDOUT = sys.stdout
 _ORIGINAL_STDERR = sys.stderr
 
 
 class Controller(Generic[_T]):
+    """
+    Controller class that controls the execution of some `runner` function
+    """
+
     _tracer = _tracer_cls
 
     def __init__(
@@ -162,6 +177,7 @@ class Controller(Generic[_T]):
             "globals",
             "locals",
             "vars",
+            # remove text for better debugging
             "copyright",
             "credits",
             "license",
@@ -169,6 +185,11 @@ class Controller(Generic[_T]):
 
     # ===== global helpers =====
     def _create_restrict_import(self) -> Callable:
+        """
+        make a restricted version of __import__ that only imports whitelisted modules
+        :return: the customized __import__ wrapper
+        """
+
         def __restricted_import__(*args):
             # Restrict imports to a whitelist
             # filter args to ONLY take in real strings so that someone can't
@@ -196,16 +217,26 @@ class Controller(Generic[_T]):
         return __restricted_import__
 
     @staticmethod
-    def _create_banned_builtins(fn) -> Callable:
+    def _create_banned_builtins(fn: Callable | str) -> Callable:
+        """
+        make a banned builtin function
+        :param fn: The function to be wrapped
+        :return: a banned function wrapper
+        """
+
         def _err_fn(*_, **__):
             raise Exception(
-                f"'{fn}' is not supported by Executor. "
-                f"If you're using a local instance, please try to turn on is_local_flag"
+                f"'{fn}' is not supported by Executor. \n"
+                f"If you're using a local instance, please try to turn on is_local_flag \n"
             )
 
         return _err_fn
 
     def _create_raw_input(self) -> Callable:
+        """
+        make a `input` function wrapper. Currently the input function is banned.
+        :return: the input wrapper
+        """
         # def _input(prompt = ""):
         #     if input_string_queue:
         #         input_str = input_string_queue.pop(0)
@@ -222,16 +253,26 @@ class Controller(Generic[_T]):
     def _create_open() -> Callable:
         def _open(*_, **__):
             raise Exception(
-                "open() is not supported by Executor. "
-                "If you're using a local instance, please try to turn on is_local_flag"
+                "open() is not supported by Executor. \n"
+                "Instead use io.StringIO() to simulate a file. \n"
+                "Here is an example: http://goo.gl/uNvBGl \n"
+                "If you're using a local instance, please try to turn on is_local_flag \n"
             )
 
         return _open
 
     def _channel_fd(self) -> None:
+        """
+        set how the default file descriptors like stdout are channeled
+        :return: None
+        """
         pass
 
     def _use_original_fd(self) -> None:
+        """
+        restore the default file descriptors
+        :return: None
+        """
         pass
 
     # ===== global helpers end =====
@@ -239,8 +280,12 @@ class Controller(Generic[_T]):
     # ===== collect basic attrs =====
 
     def _collect_builtins(self) -> None:
+        """
+        create a custom builtins dictionary for later execution and append it to the global dict
+        :return: None
+        """
         _user_builtins = {}
-        for k, v in _builtin_iterator():
+        for k, v in _builtins_iterator():
             if k == "open" and not self._is_local:
                 _user_builtins[k] = self._create_open()
             elif k in self._BANNED_BUILTINS and not self._is_local:
@@ -257,10 +302,20 @@ class Controller(Generic[_T]):
         self._user_globals["__builtins__"] = _user_builtins
 
     def _collect_globals(self) -> None:
+        """
+        collect other specified namespace
+        :return: None
+        """
         self._user_globals.update(deepcopy(self._custom_ns))
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
     def _update_globals(self, name: str, val: Any) -> None:
+        """
+        update globals namespace with name and val
+        :param name: the name
+        :param val: the value
+        :return: None
+        """
         self._user_globals[name] = val
         self._logger.debug(f"updated global attr {name} with {val} ")
 
@@ -268,6 +323,10 @@ class Controller(Generic[_T]):
 
     # ===== restrict sandbox =====
     def _restrict_resources(self) -> None:
+        """
+        use resource library to restrict cpu and memory usage when the platform is Linux
+        :return: None
+        """
         from platform import system
 
         if system() == "Linux":
@@ -291,6 +350,11 @@ class Controller(Generic[_T]):
         # resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))  # (redundancy for paranoia)
 
     def _restrict_sandbox(self):
+        """
+        sandbox the execution environment by removing posix, os, os.path, sys
+        and use resources lib to restrict resource usages if possible
+        :return:
+        """
         if resource_module_loaded and (not self._is_local):
             self._restrict_resources()
 
@@ -346,10 +410,18 @@ class Controller(Generic[_T]):
 
     @classmethod
     def _make_init_layers(cls) -> Sequence[LAYER_TYPE]:
+        """
+        init layer maker, should be overwritten by subclasses if necessary
+        :return: sequence of layer functions
+        """
         return ()
 
     @classmethod
     def _make_prep_layers(cls) -> Sequence[LAYER_TYPE]:
+        """
+        prep layer maker, should be overwritten by subclasses if necessary
+        :return: sequence of layer functions
+        """
         return (
             cls._collect_builtins,
             cls._collect_globals,
@@ -358,26 +430,39 @@ class Controller(Generic[_T]):
 
     @classmethod
     def _make_post_layers(cls) -> Sequence[LAYER_TYPE]:
+        """
+        post layer maker, should be overwritten by subclasses if necessary
+        :return: sequence of layer functions
+        """
         return (cls._use_original_fd,)
 
     # ===== layer makers end =====
 
     # ===== processes =====
     def _init_process(self) -> None:
+        """
+        run init layers
+        :return: None
+        """
         for init_fn in self._init_layers:
             init_fn(self)
 
         self._logger.debug("finished executing init process")
 
-    def _pre_process(self) -> None:
-        # not a good structure
-        self._enter_context()
+    def _prep_process(self) -> None:
+        """
+        run prep layers
+        :return: None
+        """
         for pre_fn in self._prep_layers:
             pre_fn(self)
         self._logger.debug("finished executing prep process")
 
     def _post_process(self) -> None:
-        self._exit_context()
+        """
+        run post layers
+        :return: None
+        """
         for post_fn in self._post_layers:
             post_fn(self)
 
@@ -387,10 +472,18 @@ class Controller(Generic[_T]):
 
     # ===== enter context flag switches =====
     def _enter_context(self) -> None:
+        """
+        enter context flag switch
+        :return: None
+        """
         self._in_context = True
         self._logger.debug("entered context")
 
     def _exit_context(self) -> None:
+        """
+        exit context flag switch
+        :return:
+        """
         self._in_context = False
         self._logger.debug("exited context")
 
@@ -399,17 +492,43 @@ class Controller(Generic[_T]):
     # ===== basic structures =====
 
     def __call__(self, *args, **kwargs) -> Controller[_T]:
+        """
+        init process caller
+        intended to usage: `controller_instance().main()`
+        :param args:
+        :param kwargs:
+        :return: self
+        """
         self._init_process()
         return self
 
     def __enter__(self) -> Controller[_T]:
-        self._pre_process()
+        """
+        context helper
+        :return: None
+        """
+        self._enter_context()
+        self._prep_process()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """
+        context helper
+        :param exc_type:
+        :param exc_val:
+        :param exc_tb:
+        :return: None
+        """
+        self._exit_context()
         self._post_process()
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
+        """
+        run the internal runner
+        :param args: runner args
+        :param kwargs: runner kwargs
+        :return: whatever the runner returns
+        """
         self._logger.debug(
             "start runner with\n" f"args: {args}\n" f"and kwargs: {kwargs}\n"
         )
@@ -422,7 +541,7 @@ class Controller(Generic[_T]):
                     self._logger.debug("applied run async in main")
                     result: _T = promise.get(timeout=self._re_cpu_time)
                     self._logger.debug(
-                        f"get async result in {self._re_cpu_time}s. Executed successfully? {promise.successful()}"
+                        f"got async result in {self._re_cpu_time}s. Executed successfully? {promise.successful()}"
                     )
                 except TimeoutError:
                     self._logger.debug("timeout error occurs in execution")
@@ -445,8 +564,23 @@ class Controller(Generic[_T]):
     # ===== basic end structures =====
 
     # ===== main fn =====
+    def init(self, *args, **kwargs) -> Controller[_T]:
+        """
+        same as `__call__`, but probably looks nicer
+        intended usage: `controller_instance.init().main()`
+        :param args:
+        :param kwargs:
+        :return: self
+        """
+        return self(*args, **kwargs)
 
     def main(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
+        """
+        The main function to be called
+        :param args:
+        :param kwargs:
+        :return: whatever the runner returns
+        """
         self._logger.debug(
             "started main with \n" f"args: {args}\n" f"kwargs: {kwargs}\n"
         )
@@ -457,6 +591,10 @@ class Controller(Generic[_T]):
 
 
 class GraphController(Controller):
+    """
+    Graph controller for Graphery Executor
+    """
+
     _recorder_cls: Type = _recorder_cls
     _tracer_cls: Type = _tracer_cls
 
@@ -472,17 +610,29 @@ class GraphController(Controller):
             logger=logger,
         )
 
+        # collect recorder and tracer
         self._recorder = _recorder_cls()
+        self._logger.debug("made new recorder")
+
         self._tracer = deepcopy(_tracer_cls)
         self._tracer.set_new_recorder(self._recorder)
+        self._logger.debug("made new tracer and attached a recorder")
 
     def _collect_globals(self) -> None:
         super(GraphController, self)._collect_globals()
         self._update_globals("tracer", self._tracer)
+        self._logger.debug("collected `tracer` class")
 
     def _graph_runner(
         self, code: str, graph_data: dict, options: Mapping = None
     ) -> None:
+        """
+        Graphery graph runner
+        :param code: a string of the submitted code
+        :param graph_data: the graph
+        :param options: execution options
+        :return: a list of execution records
+        """
         graph = self._graph_builder(graph_data)
 
         # TODO  load redirection to recorder
