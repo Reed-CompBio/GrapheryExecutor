@@ -2,7 +2,7 @@ from __future__ import annotations
 from os import getenv
 from typing import Type, TypeVar, Protocol, ClassVar, Mapping
 
-__all__ = ["DefaultVars", "SERVER_VERSION"]
+__all__ = ["DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
 
 _ENV_PREFIX = "GE_"
 
@@ -81,3 +81,4 @@ class DefaultVars(VarClass):
 
 # Custom Variables
 SERVER_VERSION = "3.0.0a0"
+IDENTIFIER_SEPARATOR = "\u200b@"
