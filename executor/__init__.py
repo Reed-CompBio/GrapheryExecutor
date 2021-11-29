@@ -1,1 +1,3 @@
-__version__ = "3.0.0a0"
+from .settings.variables import SERVER_VERSION
+
+__version__ = SERVER_VERSION
