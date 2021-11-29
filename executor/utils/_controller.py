@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from multiprocessing import Pool
 
 import sys
 import types
@@ -18,7 +17,7 @@ from typing import (
     List,
     Generator,
     Any,
-    Tuple,
+    ParamSpec,
 )
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -35,16 +34,20 @@ try:
 
     resource_module_loaded = True
 except ImportError:
+    resource = None
     resource_module_loaded = False
 
 __all__ = ["Controller", "GraphController"]
 
 LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
-_T = TypeVar("_T", bound=Callable)
+
+_T = TypeVar("_T")
+_P = ParamSpec("_P")
 
 
 def _builtins_getter(name: str) -> Any:
     if isinstance(__builtins__, Mapping):
+        # noinspection PyUnresolvedReferences
         return __builtins__[name]
     elif isinstance(__builtins__, types.ModuleType):
         return getattr(__builtins__, name)
@@ -54,6 +57,7 @@ def _builtins_getter(name: str) -> Any:
 
 def _builtin_iterator() -> Generator[tuple[str, Any], Any, None]:
     if isinstance(__builtins__, Mapping):
+        # noinspection PyUnresolvedReferences
         for k, v in __builtins__.items():
             yield k, v
     elif isinstance(__builtins__, types.ModuleType):
@@ -73,7 +77,7 @@ class Controller(Generic[_T]):
     def __init__(
         self,
         *,
-        runner: _T,
+        runner: Callable[_P, _T],
         default_settings: DefaultVars = DefaultENVVars,
         options: Mapping = None,
         **kwargs,
@@ -92,7 +96,7 @@ class Controller(Generic[_T]):
         self._logger.debug(f"registered post layers: {self._post_layers}")
 
         # register runner
-        self._runner = runner
+        self._runner: Callable[_P, _T] = runner
         self._logger.debug(f"registered runner")
 
         # context on flag
@@ -117,6 +121,10 @@ class Controller(Generic[_T]):
         )
 
         self._use_pool = options.get("use_pool", False)
+
+        # std
+        self._stdout = options.get("stdout", StringIO())
+        self._stderr = options.get("stderr", StringIO())
 
         # args
         self._BUILTIN_IMPORT = _builtins_getter("__import__")
@@ -154,10 +162,13 @@ class Controller(Generic[_T]):
             "globals",
             "locals",
             "vars",
+            "copyright",
+            "credits",
+            "license",
         ]
 
     # ===== global helpers =====
-    def _create_restrict_import(self):
+    def _create_restrict_import(self) -> Callable:
         def __restricted_import__(*args):
             # Restrict imports to a whitelist
             # filter args to ONLY take in real strings so that someone can't
@@ -217,18 +228,17 @@ class Controller(Generic[_T]):
 
         return _open
 
-    def _channel_fd(self):
+    def _channel_fd(self) -> None:
         pass
 
-    def _use_original_fd(self):
-        sys.stdout = _ORIGINAL_STDOUT
-        sys.stderr = _ORIGINAL_STDERR
+    def _use_original_fd(self) -> None:
+        pass
 
     # ===== global helpers end =====
 
     # ===== collect basic attrs =====
 
-    def _collect_builtins(self):
+    def _collect_builtins(self) -> None:
         _user_builtins = {}
         for k, v in _builtin_iterator():
             if k == "open" and not self._is_local:
@@ -257,10 +267,11 @@ class Controller(Generic[_T]):
     # ===== collect basic attrs end =====
 
     # ===== restrict sandbox =====
-    def _restrict_resources(self):
+    def _restrict_resources(self) -> None:
         from platform import system
 
         if system() == "Linux":
+            assert resource is not None
             resource.setrlimit(
                 resource.RLIMIT_AS, (self._re_mem_size, self._re_cpu_time)
             )
@@ -302,9 +313,11 @@ class Controller(Generic[_T]):
             for a in dir(sys.modules["os"]):
                 # 'path' is needed for __restricted_import__ to work
                 # and 'stat' is needed for some errors to be reported properly
+                # and 'fspath' is needed for logging
                 if a not in ("path", "fspath", "stat"):
                     delattr(sys.modules["os"], a)
             # ppl can dig up trashed objects with gc.get_objects()
+            # noinspection PyUnresolvedReferences
             import gc
 
             for a in dir(sys.modules["gc"]):
@@ -350,20 +363,20 @@ class Controller(Generic[_T]):
     # ===== layer makers end =====
 
     # ===== processes =====
-    def _init_process(self):
+    def _init_process(self) -> None:
         for init_fn in self._init_layers:
             init_fn(self)
 
         self._logger.debug("finished executing init process")
 
-    def _pre_process(self):
+    def _pre_process(self) -> None:
         # not a good structure
         self._enter_context()
         for pre_fn in self._prep_layers:
             pre_fn(self)
         self._logger.debug("finished executing prep process")
 
-    def _post_process(self):
+    def _post_process(self) -> None:
         self._exit_context()
         for post_fn in self._post_layers:
             post_fn(self)
@@ -373,11 +386,11 @@ class Controller(Generic[_T]):
     # ===== processes end =====
 
     # ===== enter context flag switches =====
-    def _enter_context(self):
+    def _enter_context(self) -> None:
         self._in_context = True
         self._logger.debug("entered context")
 
-    def _exit_context(self):
+    def _exit_context(self) -> None:
         self._in_context = False
         self._logger.debug("exited context")
 
@@ -393,21 +406,21 @@ class Controller(Generic[_T]):
         self._pre_process()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self._post_process()
 
-    def _run(self, *args, **kwargs) -> Tuple[StringIO, StringIO] | None:
+    def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
         self._logger.debug(
             "start runner with\n" f"args: {args}\n" f"and kwargs: {kwargs}\n"
         )
         if self._use_pool:
+            from multiprocessing import Pool
+
             with Pool(processes=1) as pool:
                 try:
                     promise = pool.apply_async(self._runner, args=args, kwds=kwargs)
                     self._logger.debug("applied run async in main")
-                    result: Tuple[StringIO, StringIO] | None = promise.get(
-                        timeout=self._re_cpu_time
-                    )
+                    result: _T = promise.get(timeout=self._re_cpu_time)
                     self._logger.debug(
                         f"get async result in {self._re_cpu_time}s. Executed successfully? {promise.successful()}"
                     )
@@ -433,7 +446,7 @@ class Controller(Generic[_T]):
 
     # ===== main fn =====
 
-    def main(self, *args, **kwargs) -> None:
+    def main(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
         self._logger.debug(
             "started main with \n" f"args: {args}\n" f"kwargs: {kwargs}\n"
         )
@@ -453,7 +466,7 @@ class GraphController(Controller):
         self,
         *,
         logger: Logger = void_logger,
-    ):
+    ) -> None:
         super().__init__(
             runner=self._graph_runner,
             logger=logger,
@@ -463,15 +476,14 @@ class GraphController(Controller):
         self._tracer = deepcopy(_tracer_cls)
         self._tracer.set_new_recorder(self._recorder)
 
-    def _collect_globals(self):
+    def _collect_globals(self) -> None:
         super(GraphController, self)._collect_globals()
         self._update_globals("tracer", self._tracer)
 
     def _graph_runner(
         self, code: str, graph_data: dict, options: Mapping = None
-    ) -> Tuple[StringIO, StringIO]:
+    ) -> None:
         graph = self._graph_builder(graph_data)
-        out, err = StringIO(), StringIO()
 
         # TODO  load redirection to recorder
         self._update_globals("graph", graph)
@@ -481,17 +493,14 @@ class GraphController(Controller):
         # self._recorder.load_options(options)
         cmd = compile(code, "<graphery_main>", "exec")
 
-        # TODO remove this
-        with redirect_stdout(out), redirect_stderr(err):
+        with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
             self._restrict_sandbox()
             exec(cmd, self._user_globals, self._user_globals)
-            self._logger.debug(
-                "executed successfully on \n"
-                "```python\n"
-                f"{code}\n"
-                "```\n"
-                "with globals \n"
-                f"{self._user_globals}"
-            )
-
-        return out, err
+        self._logger.debug(
+            "executed successfully on \n"
+            "```python\n"
+            f"{code}\n"
+            "```\n"
+            "with globals \n"
+            f"{self._user_globals}"
+        )
