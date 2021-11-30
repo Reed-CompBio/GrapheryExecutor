@@ -1184,7 +1184,7 @@ def test_unavailable_source():
             result = getattr(module, "f")(7)
             node = getattr(module, "node_list")
         assert result == 7
-        assert str(node) == "[Node(1), Node(2), Node(5), Node(7), Node(11)]"
+        assert str(node) == "[1, 2, 5, 7, 11]"
         output = output_capturer.output
         assert_output(
             output,
