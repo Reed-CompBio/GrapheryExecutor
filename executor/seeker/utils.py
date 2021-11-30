@@ -5,7 +5,7 @@ import datetime
 import os
 import re
 
-from typing import Mapping, Any, Callable, Union, Iterable
+from typing import Any, Callable, Iterable, Tuple, Type
 
 from .pycompat import ABC, string_types
 
@@ -38,12 +38,8 @@ class WritableStream(ABC):
 file_reading_errors = (IOError, OSError, ValueError)  # IronPython weirdness.
 
 
-def shitcode(s):
-    return "".join((c if (0 < ord(c) < 256) else "?") for c in s)
-
-
 def get_repr_function(
-    item: Any, custom_repr: Mapping[Union[Callable, type], Callable]
+    item: Any, custom_repr: Iterable[Tuple[Type, Callable]]
 ) -> Callable:
     """
     get default representation function `repr` or custom representation function
@@ -53,7 +49,11 @@ def get_repr_function(
     """
     for condition, action in custom_repr:
         if isinstance(condition, type):
-            condition = lambda x, y=condition: isinstance(x, y)
+            t = condition
+
+            def condition(x):
+                return isinstance(x, t)
+
         if condition(item):
             return action
     return repr
@@ -74,7 +74,7 @@ def normalize_repr(item_repr):
 
 def get_shortish_repr(
     item: Any,
-    custom_repr: Mapping[Union[Callable, type], Callable] = (),
+    custom_repr: Iterable[Tuple[Type, Callable]] = (),
     max_length: int = None,
 ):
 

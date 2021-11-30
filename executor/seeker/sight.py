@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import inspect
 import opcode
-import os
 import sys
 import re
 import collections
@@ -130,12 +129,7 @@ def get_write_function(output, overwrite):
 
         def write(s):
             stderr = sys.stderr
-            try:
-                stderr.write(s)
-            except UnicodeEncodeError:
-                # God damn Python 2
-                # LMAO hahahahahaha
-                stderr.write(utils.shitcode(s))
+            stderr.write(s)
 
     elif is_path:
         return FileWriter(output, overwrite).write
@@ -169,14 +163,7 @@ class FileWriter(object):
 
 
 thread_global = threading.local()
-_SEEKER_DISABLE_ENV_NAME = "SEEKER_DISABLED"
-DISABLED = bool(os.getenv(_SEEKER_DISABLE_ENV_NAME, ""))
-
-_LOG_OUTPUT_ENV_NAME = "SEEKER_LOG_OUTPUT_FLAG"
-using_log_output = bool(int(os.getenv(_LOG_OUTPUT_ENV_NAME, True)))
-
-_DEFAULT_OUTPUT_ENV_NAME = "SEEKER_DEFAULT_OUTPUT_FLAG"
-using_default_output = bool(int(os.getenv(_DEFAULT_OUTPUT_ENV_NAME, True)))
+DISABLED = False
 
 
 class Tracer:
@@ -186,8 +173,6 @@ class Tracer:
     def __init__(
         self,
         *watch_list,
-        default_output: bool = using_default_output,
-        log_output: bool = using_log_output,
         output: Union[str, Callable, utils.WritableStream, StringIO] = None,
         watch=(),
         watch_explode=(),
@@ -200,16 +185,9 @@ class Tracer:
         relative_time: bool = False,
         only_watch: bool = True,
     ):
-
-        if output:
-            self._log_path = output
-        elif self._logger is not None and log_output:
-            self._log_path = self.log_output
-        elif default_output:
-            self._log_path = None
-        else:
-            self._log_path = False
-        self._write = get_write_function(self._log_path, overwrite)
+        self._write = getattr(self._logger, "debug", None) or get_write_function(
+            output, overwrite
+        )
 
         self.watch = (
             [
@@ -441,7 +419,7 @@ class Tracer:
         if self.thread_info:
             current_thread = threading.current_thread()
             thread_info = "{ident}-{name} ".format(
-                ident=current_thread.ident, name=current_thread.getName()
+                ident=current_thread.ident, name=current_thread.name
             )
         thread_info = self.set_thread_info_padding(thread_info)
 
@@ -552,3 +530,6 @@ class Tracer:
             self.write("{indent}Exception:..... {exception}".format(**locals()))
 
         return self.trace
+
+
+del sys
