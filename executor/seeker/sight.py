@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import inspect
 import opcode
-import sys
+import sys as _sys
 import re
 import collections
 import datetime as datetime_module
@@ -14,14 +14,11 @@ import logging
 from types import FrameType, FunctionType
 from typing import Iterable, Tuple, Any, Mapping, Optional, List, Callable, Union
 
-from ..utils.recorder import Recorder
+from ..utils._recorder import Recorder
 from .variables import CommonVariable, Exploding, BaseVariable
 from . import utils
 
 from io import StringIO
-
-# TODO I don't need ipython related things
-ipython_filename_pattern = re.compile("^<ipython-input-([0-9]+)-.*>$")
 
 
 def get_local_values(
@@ -86,15 +83,11 @@ def get_path_and_source_from_frame(frame):
         if source is not None:
             source = source.splitlines()
     if source is None:
-        ipython_filename_match = ipython_filename_pattern.match(file_name)
-        if ipython_filename_match:
-            raise ValueError("Ipython is not supported yet.")
-        else:
-            try:
-                with open(file_name, "rb") as fp:
-                    source = fp.read().splitlines()
-            except utils.file_reading_errors as e:
-                logging.warning(f"Cannot Read Files And Determine Source. Error: {e}")
+        try:
+            with open(file_name, "rb") as fp:
+                source = fp.read().splitlines()
+        except utils.file_reading_errors as e:
+            logging.warning(f"Cannot Read Files And Determine Source. Error: {e}")
     if not source:
         # We used to check `if source is None` but I found a rare bug where it
         # was empty, but not `None`, so now we check `if not source`.
@@ -112,7 +105,7 @@ def get_path_and_source_from_frame(frame):
             if match:
                 encoding = match.group(1).decode("ascii")
                 break
-        source = [utils.text_type(sline, encoding, "replace") for sline in source]
+        source = [utils.text_type(s_line, encoding, "replace") for s_line in source]
 
     result = (file_name, source)
     source_and_path_cache[cache_key] = result
@@ -128,7 +121,7 @@ def get_write_function(output, overwrite):
     if output is None:
 
         def write(s):
-            stderr = sys.stderr
+            stderr = _sys.stderr
             stderr.write(s)
 
     elif is_path:
@@ -270,8 +263,7 @@ class Tracer:
 
         def wrapper(*args, **kwargs):
             result = func(*args, **kwargs)
-            # cls._recorder.add_ac_to_last_record('get value %s' % result)
-            cls._recorder.add_ac_to_last_record(result)
+            cls._recorder.add_variable_access_to_last_record(result)
             return result
 
         return wrapper
@@ -336,15 +328,15 @@ class Tracer:
 
         thread_global.__dict__.setdefault("depth", -1)
         stack = self.thread_local.__dict__.setdefault("original_trace_functions", [])
-        stack.append(sys.gettrace())
+        stack.append(_sys.gettrace())
         self.start_times[calling_frame] = datetime_module.datetime.now()
-        sys.settrace(self.trace)
+        _sys.settrace(self.trace)
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         if DISABLED:
             return
         stack = self.thread_local.original_trace_functions
-        sys.settrace(stack.pop())
+        _sys.settrace(stack.pop())
         calling_frame = inspect.currentframe().f_back
         self.target_frames.discard(calling_frame)
         self.frame_to_local_reprs.pop(calling_frame, None)
@@ -470,17 +462,25 @@ class Tracer:
 
             if name not in old_local_reprs:
                 if event == "call" or event == "return":
-                    self.recorder.add_vc_to_last_record(identifier_string, value)
+                    self.recorder.add_variable_change_to_last_record(
+                        identifier_string, value
+                    )
                 else:
-                    self.recorder.add_vc_to_previous_record(identifier_string, value)
+                    self.recorder.add_variable_change_to_second_to_last_record(
+                        identifier_string, value
+                    )
                 self.write(
                     "{indent}{newish_string}{name} = {value_repr}".format(**locals())
                 )
             elif old_local_reprs[name][1] != value_repr:
                 if event == "return":
-                    self.recorder.add_vc_to_last_record(identifier_string, value)
+                    self.recorder.add_variable_change_to_last_record(
+                        identifier_string, value
+                    )
                 else:
-                    self.recorder.add_vc_to_previous_record(identifier_string, value)
+                    self.recorder.add_variable_change_to_second_to_last_record(
+                        identifier_string, value
+                    )
                 self.write(
                     "{indent}Modified var:.. {name} = {value_repr}".format(**locals())
                 )
@@ -530,6 +530,3 @@ class Tracer:
             self.write("{indent}Exception:..... {exception}".format(**locals()))
 
         return self.trace
-
-
-del sys
