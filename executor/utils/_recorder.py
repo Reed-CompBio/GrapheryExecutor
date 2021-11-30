@@ -73,6 +73,11 @@ class Recorder:
     _INNER_IDENTIFIER = ("", "\u200b{}".format("inner"))
     _INNER_IDENTIFIER_STRING = identifier_to_string(_INNER_IDENTIFIER)
 
+    _DEFAULT_COLOR_MAPPING = {
+        _INNER_IDENTIFIER_STRING: _DEFAULT_COLOR_PALETTE[0],
+        _ACCESSED_IDENTIFIER_STRING: _DEFAULT_COLOR_PALETTE[1],
+    }
+
     _GRAPH_OBJECT_MAPPING = {
         is_node: Node.graphery_type_flag,
         is_edge: Edge.graphery_type_flag,
@@ -138,10 +143,10 @@ class Recorder:
 
     _BAD_REPR_STRING = "BAD REPR FUNCTION"
 
-    def __init__(self, *, graph: Graph, logger: Logger = void_logger):
+    def __init__(self, *, graph: Graph = None, logger: Logger = void_logger):
         self._changes: List[MutableMapping] = []
         self._final_changes: List[MutableMapping] | None = None
-        self._color_mapping: MutableMapping = {}
+        self._color_mapping: MutableMapping = {**self._DEFAULT_COLOR_MAPPING}
         self._logger = logger
 
         # since node and edges don't carry data anymore
@@ -164,6 +169,20 @@ class Recorder:
             self._color_mapping[identifier_string] = color
 
         return self._color_mapping[identifier_string]
+
+    def register_variable(self, identifier: Sequence[str]) -> str:
+        """
+        a variable is identified by a identifier, which is
+        a tuple of two strings. The first strings is the
+        name of the place, ie functions etc., in which the
+        variable is created. The second string is the variable
+        name.
+        :param identifier:
+        :return:
+        """
+        identifier_string = identifier_to_string(identifier)
+        self.assign_and_get_color(identifier_string)
+        return identifier_string
 
     def add_record(self, line_no: int = -1) -> None:
         """
