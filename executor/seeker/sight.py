@@ -12,7 +12,7 @@ import threading
 import traceback
 import logging
 from types import FrameType, FunctionType
-from typing import Iterable, Tuple, Any, Mapping, Optional, List, Callable, Union
+from typing import Iterable, Tuple, Any, Mapping, Optional, List, Callable, Union, Dict
 
 from ..utils._recorder import Recorder
 from .variables import CommonVariable, Exploding, BaseVariable
@@ -63,18 +63,20 @@ class UnavailableSource:
 source_and_path_cache = {}
 
 
-def get_path_and_source_from_frame(frame):
+def get_path_and_source_from_frame(
+    frame, additional_source: Mapping[Tuple[str, str], Tuple[str, List[str]]] = ()
+) -> Tuple[str, List[str]]:
     globs = frame.f_globals or {}
     module_name = globs.get("__name__")
     file_name = frame.f_code.co_filename
     cache_key = (module_name, file_name)
-    try:
+    if cache_key in source_and_path_cache:
         return source_and_path_cache[cache_key]
-    except KeyError:
-        pass
-    loader = globs.get("__loader__")
+    elif cache_key in additional_source:
+        return additional_source[cache_key]
 
     source = None
+    loader = globs.get("__loader__")
     if hasattr(loader, "get_source"):
         try:
             source = loader.get_source(module_name)
@@ -162,6 +164,9 @@ DISABLED = False
 class Tracer:
     _recorder: Recorder = None
     _logger: logging.Logger = None
+    _additional_source: Dict[
+        Tuple[str, str], Tuple[str, List[str]]
+    ] = {}  # {(module_name, file_name): (file_name, source)}
 
     def __init__(
         self,
@@ -240,6 +245,12 @@ class Tracer:
     @classmethod
     def log_output(cls, message: str) -> None:
         cls._logger.info(message.rstrip())
+
+    @classmethod
+    def set_additional_source(
+        cls, key: Tuple[str, str], value: Tuple[str, List[str]]
+    ) -> None:
+        cls._additional_source[key] = value
 
     def __call__(self, function_or_class):
         if DISABLED:
@@ -402,7 +413,9 @@ class Tracer:
 
         # get line_no
         line_no = frame.f_lineno
-        source_path, source = get_path_and_source_from_frame(frame)
+        source_path, source = get_path_and_source_from_frame(
+            frame, self._additional_source
+        )
         if self.last_source_path != source_path:
             self.write("{indent}Source path:... {source_path}".format(**locals()))
             self.last_source_path = source_path
