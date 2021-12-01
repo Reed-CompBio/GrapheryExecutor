@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import deepcopy, copy
 
-import sys
+import sys as _sys
 import types
 from io import StringIO
 from logging import Logger
@@ -19,6 +19,7 @@ from typing import (
     Any,
     ParamSpec,
     MutableMapping,
+    Final,
 )
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -44,6 +45,10 @@ LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
+
+
+_DEFAULT_MODULE_NAME: Final[str] = "__main__"
+_DEFAULT_FILE_NAME: Final[str] = "<graphery_main>"
 
 
 def _builtins_getter(name: str) -> Any:
@@ -79,8 +84,8 @@ def _builtins_iterator() -> Generator[tuple[str, Any], Any, None]:
 
 
 # system stdout and stderr
-_ORIGINAL_STDOUT = sys.stdout
-_ORIGINAL_STDERR = sys.stderr
+_ORIGINAL_STDOUT = _sys.stdout
+_ORIGINAL_STDERR = _sys.stderr
 
 
 class Controller(Generic[_T]):
@@ -125,7 +130,7 @@ class Controller(Generic[_T]):
 
         # sandbox
         self._default_settings = default_settings
-        self._user_globals = {"__name__": "__main__"}
+        self._user_globals = {"__name__": _DEFAULT_MODULE_NAME}
         self._re_mem_size = options.get(
             "re_mem_size",
             self._default_settings[self._default_settings.EXEC_MEM_OUT],
@@ -143,12 +148,11 @@ class Controller(Generic[_T]):
         self._stderr = options.get("stderr", StringIO())
 
         # args
-        self._BUILTIN_IMPORT = _builtins_getter("__import__")
-        self._ALLOWED_STDLIB_MODULE_IMPORTS = (
+        self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
+        self._ALLOWED_STDLIB_MODULE_IMPORTS: Final = (
             "math",
             "random",
             "time",
-            "datetime",
             "functools",
             "itertools",
             "operator",
@@ -161,9 +165,10 @@ class Controller(Generic[_T]):
             "copy",
             "hashlib",
         )
+        map(self._BUILTIN_IMPORT, self._ALLOWED_STDLIB_MODULE_IMPORTS)
 
-        self._DEL_MODULES = ("os", "sys", "posix", "gc")
-        self._BANNED_BUILTINS = [
+        self._DEL_MODULES: Final = ("os", "sys", "posix", "gc")
+        self._BANNED_BUILTINS: Final = [
             "reload",
             "open",
             "compile",
@@ -307,7 +312,7 @@ class Controller(Generic[_T]):
         collect other specified namespace
         :return: None
         """
-        self._user_globals.update(deepcopy(self._custom_ns))
+        self._user_globals.update(copy(self._custom_ns))
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
     def _update_globals(self, name: str, val: Any) -> None:
@@ -321,6 +326,25 @@ class Controller(Generic[_T]):
         self._logger.debug(f"updated global attr {name} with {val} ")
 
     # ===== collect basic attrs end =====
+
+    # ===== custom modules =====
+    @staticmethod
+    def _make_custom_module(
+        module_name: str,
+        module_attrs: Mapping[str, Any],
+    ) -> types.ModuleType:
+        _mod = types.ModuleType(module_name)
+        for k, v in module_attrs.items():
+            setattr(_mod, k, v)
+        return _mod
+
+    def _add_custom_module(self, module: types.ModuleType, *aliases: str) -> None:
+        if len(aliases) < 1:
+            raise ValueError("module should have at least a name")
+        for alias in aliases:
+            self._custom_ns[alias] = module
+
+    # ===== custom modules end =====
 
     # ===== restrict sandbox =====
     def _restrict_resources(self) -> None:
@@ -370,24 +394,24 @@ class Controller(Generic[_T]):
             #  is baked into the python executable, ergh. Actually DON'T
             #  "del sys.modules['posix']", since re-importing it will
             #  refresh all of the attributes. ergh^2)
-            for a in dir(sys.modules["posix"]):
-                delattr(sys.modules["posix"], a)
-            del sys.modules["posix"]
+            for a in dir(_sys.modules["posix"]):
+                delattr(_sys.modules["posix"], a)
+            del _sys.modules["posix"]
 
             # do the same with os
-            for a in dir(sys.modules["os"]):
+            for a in dir(_sys.modules["os"]):
                 # 'path' is needed for __restricted_import__ to work
                 # and 'stat' is needed for some errors to be reported properly
                 # and 'fspath' is needed for logging
-                if a not in ("path", "fspath", "stat"):
-                    delattr(sys.modules["os"], a)
+                if a not in ("path", "fspath", "stat", "PathLike", "_check_methods"):
+                    delattr(_sys.modules["os"], a)
             # ppl can dig up trashed objects with gc.get_objects()
             # noinspection PyUnresolvedReferences
             import gc
 
-            for a in dir(sys.modules["gc"]):
-                delattr(sys.modules["gc"], a)
-            del sys.modules["gc"]
+            for a in dir(_sys.modules["gc"]):
+                delattr(_sys.modules["gc"], a)
+            del _sys.modules["gc"]
 
             # sys.modules contains an in-memory cache of already-loaded
             # modules, so if you delete modules from here, they will
@@ -399,11 +423,11 @@ class Controller(Generic[_T]):
             #
             # Of course, this isn't a foolproof solution by any means,
             # and it might lead to UNEXPECTED FAILURES later in execution.
-            del sys.modules["os"]
-            del sys.modules["os.path"]
-            del sys.modules["platform"]
+            del _sys.modules["os"]
+            del _sys.modules["os.path"]
+            del _sys.modules["platform"]
             # TODO remove Pool maybe?
-            del sys.modules["sys"]
+            del _sys.modules["sys"]
 
     # ===== restrict sandbox end =====
 
@@ -626,9 +650,13 @@ class GraphController(Controller):
         self._tracer = deepcopy(_tracer_cls)
         self._tracer.set_new_recorder(self._recorder)
         self._logger.debug("made new tracer and attached a recorder")
+        self._tracer.set_additional_source(
+            (_DEFAULT_MODULE_NAME, _DEFAULT_FILE_NAME),
+            (_DEFAULT_FILE_NAME, self._code.splitlines()),
+        )
 
     def _collect_globals(self) -> None:
-        super(GraphController, self)._collect_globals()
+        self._add_custom_module(nx, "nx", "networkx")
 
         # place trace
         self._update_globals("tracer", self._tracer)
@@ -639,6 +667,8 @@ class GraphController(Controller):
         self._update_globals("graph", self._graph)
         self._logger.debug(f"updated graph in user globals with {self._graph}")
 
+        super(GraphController, self)._collect_globals()
+
     # TODO add option setter such as rand seed
 
     def _graph_runner(self) -> list[MutableMapping]:
@@ -646,7 +676,7 @@ class GraphController(Controller):
         Graphery graph runner
         :return: a list of execution records but None for now
         """
-        cmd = compile(self._code, "<graphery_main>", "exec")
+        cmd = compile(self._code, _DEFAULT_FILE_NAME, "exec")
 
         with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
             self._restrict_sandbox()
