@@ -70,10 +70,10 @@ def get_path_and_source_from_frame(
     module_name = globs.get("__name__")
     file_name = frame.f_code.co_filename
     cache_key = (module_name, file_name)
-    if cache_key in source_and_path_cache:
-        return source_and_path_cache[cache_key]
-    elif cache_key in additional_source:
+    if cache_key in additional_source:
         return additional_source[cache_key]
+    elif cache_key in source_and_path_cache:
+        return source_and_path_cache[cache_key]
 
     source = None
     loader = globs.get("__loader__")
