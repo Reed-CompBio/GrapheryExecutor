@@ -1,6 +1,6 @@
 from __future__ import annotations
 from os import getenv
-from typing import Type, TypeVar, Protocol, ClassVar, Mapping
+from typing import Type, TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
 
 __all__ = ["DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
 
@@ -9,6 +9,8 @@ _ENV_PREFIX = "GE_"
 
 class VarClass(Protocol):
     vars: ClassVar[Mapping[str, ...]]
+    server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
+    local_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
     @classmethod
     def read_from_env(cls, *args, use_default: bool = False) -> None:
@@ -56,6 +58,26 @@ class DefaultVars(VarClass):
         DEFAULT_FLOAT_PRECISION: 4,
         ALLOW_BUILTIN_FUNCTIONS: False,
     }
+
+    server_shell_var = {
+        SERVER_URL: (
+            ("-u", "--url"),
+            {
+                "default": vars[SERVER_URL],
+                "type": str,
+                "help": "The url the local server will run on",
+            },
+        ),
+        SERVER_PORT: (
+            ("-p", "--port"),
+            {
+                "default": vars[SERVER_PORT],
+                "type": int,
+                "help": "The port the local server will run on",
+            },
+        ),
+    }
+    local_shell_var = {}
 
     @classmethod
     def read_from_env(
