@@ -1,77 +1,59 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Set
-from collections import Counter
-from copy import deepcopy, copy
+import random
+from copy import copy, deepcopy
+from logging import Logger
 from numbers import Number
-from random import randint
 from typing import (
-    Any,
-    List,
-    MutableMapping,
     Sequence,
+    List,
     Tuple,
     Deque,
-    Union,
+    Set,
+    Counter,
+    Mapping,
+    MutableMapping,
+    Any,
     Dict,
-    Optional,
+    Union,
 )
 
-from networkx import Node, Edge
-
-IDENTIFIER_SEPARATOR = u"\u200b@"
+from networkx import (
+    Node,
+    is_node,
+    Edge,
+    is_edge,
+    DataEdge,
+    is_data_edge,
+    MultiEdge,
+    is_multi_edge,
+    DataMultiEdge,
+    is_data_multi_edge,
+    Graph,
+)
+from .logger import void_logger
+from ..settings import IDENTIFIER_SEPARATOR
 
 
 def identifier_to_string(identifier: Sequence[str]) -> str:
     return IDENTIFIER_SEPARATOR.join(identifier)
 
 
+# used to fix color generation
+_color_r = random.Random(0)
+
+
 def generate_hex() -> str:
-    random_number = randint(0, 0xFFFFFF)
+    random_number = _color_r.randint(0, 0xFFFFFF)
     hex_number = str(hex(random_number))
     return "#" + hex_number[2:]
 
 
 class Recorder:
-    """
-    The recoder is used to record variable changes in each step
-    the format is a list containing dictionaries::
-
-        [
-            {
-                'line': line,
-                'variables': {
-                    'identity': {
-                        'type': 'some_type',
-                        'color': 'some_color_hex',
-                        'repr': 'some_repr',
-                        'properties': {
-                            'property_1': str or number,
-                            ...
-                        }
-                    }
-                },
-                'accesses': [
-                    {
-                       'type': 'some_type',
-                        'color': 'some_color_hex',
-                        'repr': 'some_repr',
-                        'properties': {
-                            'property_1': str or number,
-                            ...
-                        }
-                    }
-                ],
-                'order': ['identity1', 'identity2', ...]
-            },
-            ...
-        ]
-    """
-
-    _COLOR_PALETTE = [
+    _DEFAULT_COLOR_PALETTE = [
         "#828282",
-        "#B15928",  # reserved for inner variables and global access
+        "#B15928",
         "#A6CEE3",
         "#1F78B4",
         "#B2DF8A",
@@ -88,19 +70,25 @@ class Recorder:
     _ACCESSED_IDENTIFIER = ("global", "accessed var")
     _ACCESSED_IDENTIFIER_STRING = identifier_to_string(_ACCESSED_IDENTIFIER)
 
-    _INNER_IDENTIFIER = ("", u"\u200b{}".format("inner"))
+    _INNER_IDENTIFIER = ("", "\u200b{}".format("inner"))
     _INNER_IDENTIFIER_STRING = identifier_to_string(_INNER_IDENTIFIER)
 
     _DEFAULT_COLOR_MAPPING = {
-        _INNER_IDENTIFIER_STRING: _COLOR_PALETTE[0],
-        _ACCESSED_IDENTIFIER_STRING: _COLOR_PALETTE[1],
+        _INNER_IDENTIFIER_STRING: _DEFAULT_COLOR_PALETTE[0],
+        _ACCESSED_IDENTIFIER_STRING: _DEFAULT_COLOR_PALETTE[1],
+    }
+
+    _GRAPH_OBJECT_MAPPING = {
+        is_node: Node.graphery_type_flag,
+        is_edge: Edge.graphery_type_flag,
+        is_data_edge: DataEdge.graphery_type_flag,
+        is_multi_edge: MultiEdge.graphery_type_flag,
+        is_data_multi_edge: DataMultiEdge.graphery_type_flag,
     }
 
     _SINGULAR_MAPPING = {
         Number: "Number",
         str: "String",
-        Node: "Node",
-        Edge: "Edge",
         type(None): "None",
     }
 
@@ -131,10 +119,11 @@ class Recorder:
         # wildcard
         object: _OBJECT_TYPE_STRING,
     }
+
     _INIT_TYPE_STRING = "init"
     _REFERENCE_TYPE_STRING = "reference"
 
-    _GRAPH_OBJECT_TYPES = {"Node", "Edge"}
+    _GRAPH_OBJECT_TYPES = set(_GRAPH_OBJECT_MAPPING.values())
     _SINGULAR_TYPES = set(_SINGULAR_MAPPING.values())
     _LINEAR_CONTAINER_TYPES = set(_LINEAR_CONTAINER_MAPPING.values())
     _PAIR_CONTAINER_TYPES = set(_PAIR_CONTAINER_MAPPING.values())
@@ -142,8 +131,8 @@ class Recorder:
     _TYPE_HEADER = "type"
     _COLOR_HEADER = "color"
     _REPR_HEADER = "repr"
-    _ID_HEADER = "id"
-    _PROPERTY_HEADER = "properties"
+    _GRAPH_ID_HEADER = "id"
+    _GRAPH_PROPERTY_HEADER = "properties"
     _PYTHON_ID_HEADER = "python_id"
 
     _LINE_HEADER = "line"
@@ -154,44 +143,52 @@ class Recorder:
 
     _BAD_REPR_STRING = "BAD REPR FUNCTION"
 
-    def __init__(self):
+    def __init__(self, *, graph: Graph = None, logger: Logger = void_logger):
         self._changes: List[MutableMapping] = []
-        self._processed_changes: Optional[List[MutableMapping]] = None
+        self._final_changes: List[MutableMapping] | None = None
         self._color_mapping: MutableMapping = {**self._DEFAULT_COLOR_MAPPING}
+        self._logger = logger
 
-    def assign_color(self, identifier_string: str) -> None:
+        # since node and edges don't carry data anymore
+        self._graph = graph
+
+    def assign_and_get_color(self, identifier_string: str) -> None:
+        """
+        assign color to identifier some string
+        :param identifier_string: the identifier string
+        :return: the color
+        """
         if identifier_string not in self._color_mapping:
-            if len(self._color_mapping) < len(self._COLOR_PALETTE):
-                color = self._COLOR_PALETTE[len(self._color_mapping)]
+            if len(self._color_mapping) < len(self._DEFAULT_COLOR_PALETTE):
+                color = self._DEFAULT_COLOR_PALETTE[len(self._color_mapping)]
             else:
                 color = generate_hex()
                 while color in self._color_mapping.values():
                     color = generate_hex()
+            self._logger.debug(f"assigned color {color} for {identifier_string}")
             self._color_mapping[identifier_string] = color
 
-    def register_variable(self, identifier: Sequence[str]) -> str:
-        """Register a variable
+        return self._color_mapping[identifier_string]
 
+    def register_variable(self, identifier: Sequence[str]) -> str:
+        """
         a variable is identified by a identifier, which is
         a tuple of two strings. The first strings is the
         name of the place, ie functions etc., in which the
         variable is created. The second string is the variable
         name.
-        @param identifier:
-        @return:
+        :param identifier:
+        :return:
         """
         identifier_string = identifier_to_string(identifier)
-        self.assign_color(identifier_string)
+        self.assign_and_get_color(identifier_string)
         return identifier_string
 
-    # TODO test this
     def add_record(self, line_no: int = -1) -> None:
         """
         add a record to the change list
-        name clarification:
-                            - @keyword variables: means variable changes
-                            - @keyword accesses: means access changes
-        @param line_no: the line number
+        :param line_no: the line number
+        :return:
         """
         self._changes.append(
             {
@@ -204,52 +201,62 @@ class Recorder:
     def get_last_record(self) -> MutableMapping:
         """
         get the last record
-        @return: the last record
+        :return: a record mapping
         """
         return self._changes[-1]
 
     def get_last_record_line_number(self) -> int:
+        """
+        get the line number of the last record
+        :return: a line number
+        """
         return self.get_last_record()[self._LINE_HEADER]
 
-    def get_previous_record(self) -> MutableMapping:
-        """Get the second last record in the record list
-
-        In general cases, the first input line may not be
-        empty, so `self.changes[-2]` will result in
-        IndexError. In this case, we use `self.changes[-1]`
+    def get_second_to_last_record(self) -> MutableMapping:
         """
+        ok this get the second to last record
+        :return: a record mapping
+        """
+
         # this should not be a problem in official use, since the first line in the main function
         # ie. `def main()`: has no variables.
         return self._changes[-2] if len(self._changes) > 1 else self._changes[-1]
 
-    def get_previous_record_line_number(self) -> int:
-        return self.get_previous_record()[self._LINE_HEADER]
-
-    def get_last_vc(self) -> MutableMapping:
-        """get the last variable change dict
-
-        @return: variables dict in the last record
+    def get_second_to_last_record_line_number(self) -> int:
         """
+        get the line number of the second to last record
+        :return: a line number
+        """
+        return self.get_second_to_last_record()[self._LINE_HEADER]
+
+    def get_last_variable_change(self) -> MutableMapping:
+        """
+        get the last variable change dict
+        :return: variable dict in the last record
+        """
+
         last_variable_change = self.get_last_record()[self._VARIABLE_HEADER]
         if last_variable_change is None:
             last_variable_change = self.get_last_record()[self._VARIABLE_HEADER] = {}
 
         return last_variable_change
 
-    def get_previous_vc(self) -> MutableMapping:
+    def get_second_to_last_variable_change(self) -> MutableMapping:
         """Get the second last dict in the record list"""
-        previous_variable_change = self.get_previous_record()[self._VARIABLE_HEADER]
+        previous_variable_change = self.get_second_to_last_record()[
+            self._VARIABLE_HEADER
+        ]
         if previous_variable_change is None:
-            previous_variable_change = self.get_previous_record()[
+            previous_variable_change = self.get_second_to_last_record()[
                 self._VARIABLE_HEADER
             ] = {}
 
         return previous_variable_change
 
-    def get_last_ac(self) -> List:
+    def get_last_variable_access(self) -> List:
         """
         get the access list from the last record
-        @return: accesses list in the last record
+        :return: access list in the last record
         """
         if self.get_last_record()["accesses"] is None:
             self.get_last_record()["accesses"] = []
@@ -303,11 +310,16 @@ class Recorder:
             var_real_type = self._search_type_string(variable_state)
             repr_result = (
                 self._generate_repr(variable_state)
-                if var_real_type in self._SINGULAR_TYPES
-                or var_real_type == self._OBJECT_TYPE_STRING
+                if (
+                    var_real_type in self._SINGULAR_TYPES
+                    or var_real_type == self._OBJECT_TYPE_STRING
+                )
                 else None
             )
-            # which should always None
+            # which should always be None
+        elif variable_type in self._GRAPH_OBJECT_TYPES:
+            # TODO use custom graph repr generator
+            repr_result = self._generate_singular_repr(variable_state)
         elif (
             variable_type in self._SINGULAR_TYPES
             or variable_type == self._OBJECT_TYPE_STRING
@@ -327,6 +339,10 @@ class Recorder:
         return repr_result
 
     def _search_type_string(self, variable_state: Any) -> str:
+        for type_validator, type_string in self._GRAPH_OBJECT_MAPPING.items():
+            if type_validator(variable_state):
+                return type_string
+
         for type_candidate, type_string in self._TYPE_MAPPING.items():
             if isinstance(variable_state, type_candidate):
                 return type_string
@@ -358,17 +374,15 @@ class Recorder:
 
         if state_mapping[self._TYPE_HEADER] in self._GRAPH_OBJECT_TYPES:
             variable_state: Union[Node, Edge]
-            state_mapping[self._PROPERTY_HEADER] = self.process_variable_state(
-                self._INNER_IDENTIFIER_STRING,
-                variable_state.properties,
-                memory_trace,
-            )
 
-            state_mapping[self._ID_HEADER] = variable_state.cy_id
+            # TODO deal with id
+            state_mapping[self._GRAPH_ID_HEADER] = str(variable_state)
+            # TODO deal with properties
+            state_mapping[self._GRAPH_PROPERTY_HEADER] = {}
 
         return state_mapping
 
-    def add_vc_to_last_record(
+    def add_variable_change_to_last_record(
         self, variable_identifier_string: str, variable_state: Any
     ) -> None:
         """
@@ -378,11 +392,11 @@ class Recorder:
         @return: None
         """
         # if isinstance(variable_change, Tuple):
-        self.get_last_vc()[variable_identifier_string] = self.process_variable_state(
-            variable_identifier_string, variable_state
-        )
+        self.get_last_variable_change()[
+            variable_identifier_string
+        ] = self.process_variable_state(variable_identifier_string, variable_state)
 
-    def add_vc_to_previous_record(
+    def add_variable_change_to_second_to_last_record(
         self, variable_identifier_string: str, variable_state: Any
     ) -> None:
         """Add variable change to previous (second last if possible) record.
@@ -395,17 +409,17 @@ class Recorder:
         @return:
         """
         # if isinstance(variable_change, Tuple) and len(self.changes) > 1:
-        self.get_previous_vc()[
+        self.get_second_to_last_variable_change()[
             variable_identifier_string
         ] = self.process_variable_state(variable_identifier_string, variable_state)
 
-    def add_ac_to_last_record(self, access_change: Any) -> None:
+    def add_variable_access_to_last_record(self, access_change: Any) -> None:
         """
         add an access change to the last record
         @param access_change: what's accessed
         @return: None
         """
-        self.get_last_ac().append(
+        self.get_last_variable_access().append(
             self.process_variable_state(self._ACCESSED_IDENTIFIER_STRING, access_change)
         )
 
@@ -429,7 +443,7 @@ class Recorder:
         }
 
     def _process_change_list(self) -> List[MutableMapping]:
-        if self._processed_changes is None:
+        if self._final_changes is None:
             init_object = self._init_result_object
 
             temp_container = [init_object]
@@ -452,27 +466,23 @@ class Recorder:
 
                 temp_container.append(temp_object)
 
-            self._processed_changes = temp_container
+            self._final_changes = temp_container
 
-        return self._processed_changes
+        return self._final_changes
 
     def get_change_list(self) -> List[MutableMapping]:
+        return self._changes
+
+    @property
+    def change_list(self):
         return self._changes
 
     def get_processed_change_list(self) -> List[MutableMapping]:
         return self._process_change_list()
 
+    @property
+    def final_change_list(self):
+        return self._process_change_list()
+
     def get_change_list_json(self) -> str:
         return json.dumps(self.get_processed_change_list())
-
-    def purge_changes(self) -> None:
-        self._changes: List[dict] = []
-        self._color_mapping: MutableMapping = {**self._DEFAULT_COLOR_MAPPING}
-
-    def purge_processed_changes(self) -> None:
-        self._processed_changes = None
-
-    def purge(self) -> None:
-        """Empty previous recorded items"""
-        self.purge_processed_changes()
-        self.purge_changes()

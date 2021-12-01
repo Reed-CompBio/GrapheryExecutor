@@ -14,7 +14,7 @@ import logging
 from types import FrameType, FunctionType
 from typing import Iterable, Tuple, Any, Mapping, Optional, List, Callable, Union, Dict
 
-from ..utils._recorder import Recorder
+from ..utils.recorder import Recorder
 from .variables import CommonVariable, Exploding, BaseVariable
 from . import utils
 
