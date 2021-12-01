@@ -20,6 +20,7 @@ from typing import (
     ParamSpec,
     MutableMapping,
     Final,
+    Dict,
 )
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -106,7 +107,7 @@ class Controller(Generic[_T]):
         options = {**(options or {}), **kwargs}
 
         # register logger
-        self._logger = options.get("logger", void_logger)
+        self._logger: Logger = options.get("logger", void_logger)
 
         # register control layers
         self._init_layers: List[LAYER_TYPE] = [*self._make_init_layers()]
@@ -121,16 +122,16 @@ class Controller(Generic[_T]):
         self._logger.debug(f"registered runner")
 
         # context on flag
-        self._in_context = False
+        self._in_context: bool = False
 
         # local flag
-        self._is_local = options.get("is_local", False)
+        self._is_local: bool = options.get("is_local", False)
 
-        self._custom_ns = options.get("custom_ns", {})
+        self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
 
         # sandbox
         self._default_settings = default_settings
-        self._user_globals = {"__name__": _DEFAULT_MODULE_NAME}
+        self._user_globals: Dict[str, Any] = {"__name__": _DEFAULT_MODULE_NAME}
         self._re_mem_size = options.get(
             "re_mem_size",
             self._default_settings[self._default_settings.EXEC_MEM_OUT],
@@ -206,7 +207,9 @@ class Controller(Generic[_T]):
 
             importing_name = args[0]
 
-            if importing_name in whitelisted_imports:
+            if importing_name in self._custom_ns:
+                return self._custom_ns[importing_name]
+            elif importing_name in whitelisted_imports:
                 imported_mod = self._BUILTIN_IMPORT(*args)
 
                 # somewhat weak protection against imported modules that contain one
