@@ -166,7 +166,6 @@ class Controller(Generic[_T]):
             "copy",
             "hashlib",
         )
-        map(self._BUILTIN_IMPORT, self._ALLOWED_STDLIB_MODULE_IMPORTS)
 
         self._DEL_MODULES: Final = ("os", "sys", "posix", "gc")
         self._BANNED_BUILTINS: Final = [
