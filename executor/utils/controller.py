@@ -104,6 +104,21 @@ class Controller(Generic[_T]):
         options: Mapping = None,
         **kwargs,
     ) -> None:
+        """
+        initializer of a controller
+        each controller is designed to be single use
+        :param runner:
+        :param default_settings:
+        :param options:
+        :param logger:
+        :param is_local:
+        :param custom_ns:
+        :param controller:
+        :param re_cpu_time:
+        :param stdout:
+        :param stderr:
+        :param kwargs:
+        """
         options = {**(options or {}), **kwargs}
 
         # register logger
@@ -130,18 +145,23 @@ class Controller(Generic[_T]):
         self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
 
         # sandbox
-        self._default_settings = default_settings
         self._user_globals: Dict[str, Any] = {"__name__": _DEFAULT_MODULE_NAME}
+
+        self._default_settings = default_settings
+        self._logger.debug(f"controller uses settings {default_settings}")
         self._re_mem_size = options.get(
             "re_mem_size",
             self._default_settings[self._default_settings.EXEC_MEM_OUT],
         ) * int(
             10e6
         )  # convert mb to bytes
+        self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
         self._re_cpu_time = options.get(
             "re_cpu_time", self._default_settings[self._default_settings.EXEC_TIME_OUT]
         )
+        self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
+        # should always be false for now
         self._use_pool = options.get("use_pool", False)
 
         # std
@@ -560,23 +580,7 @@ class Controller(Generic[_T]):
             "start runner with\n" f"args: {args}\n" f"and kwargs: {kwargs}\n"
         )
         if self._use_pool:
-            from multiprocessing import Pool
-
-            with Pool(processes=1) as pool:
-                try:
-                    promise = pool.apply_async(self._runner, args=args, kwds=kwargs)
-                    self._logger.debug("applied run async in main")
-                    result: _T = promise.get(timeout=self._re_cpu_time)
-                    self._logger.debug(
-                        f"got async result in {self._re_cpu_time}s. Executed successfully? {promise.successful()}"
-                    )
-                except TimeoutError:
-                    self._logger.debug("timeout error occurs in execution")
-                    result = None
-                except Exception:
-                    self._logger.debug("unknown exception occurs in execution")
-                    self._logger.error(format_exc())
-                    result = None
+            raise ValueError("multiprocessing.Pool is not supported yet")
         else:
             try:
                 result = self._runner(*args, **kwargs)
@@ -588,7 +592,7 @@ class Controller(Generic[_T]):
         self._logger.debug("finished runner")
         return result
 
-    # ===== basic end structures =====
+    # ===== basic structures end =====
 
     # ===== main fn =====
     def init(self, *args, **kwargs) -> Controller[_T]:
@@ -632,7 +636,6 @@ class GraphController(Controller):
         *,
         code: str,
         graph_data: dict,
-        exec_options: Mapping = None,
         graph: nx.Graph = None,
         logger: Logger = void_logger,
         options: Mapping = None,
@@ -643,7 +646,6 @@ class GraphController(Controller):
         self._code = code
         self._graph_data = graph_data
         self._graph = graph or self._graph_builder(graph_data)
-        self._exec_options = exec_options or {}
 
         # collect recorder and tracer
         self._recorder = _recorder_cls(graph=self._graph, logger=logger)
@@ -664,15 +666,12 @@ class GraphController(Controller):
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
 
-        # TODO make new module for sigh
-
         self._update_globals("graph", self._graph)
         self._logger.debug(f"updated graph in user globals with {self._graph}")
 
         super(GraphController, self)._collect_globals()
 
     # TODO add option setter such as rand seed
-
     def _graph_runner(self) -> list[MutableMapping]:
         """
         Graphery graph runner
