@@ -207,6 +207,11 @@ class _RandomContext(LayerContext):
         self._ctrl.logger.debug("reset random seed")
 
 
+class ErrorResult:
+    def __init__(self, error_traceback: str):
+        self.error_traceback = error_traceback
+
+
 class Controller(Generic[_T]):
     """
     Controller class that controls the execution of some `runner` function
@@ -312,7 +317,8 @@ class Controller(Generic[_T]):
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
-        self._ALLOWED_STDLIB_MODULE_IMPORTS: Final = (
+
+        self._ALLOWED_STDLIB_MODULE_IMPORTS: Final = [
             "math",
             "random",
             "time",
@@ -327,9 +333,8 @@ class Controller(Generic[_T]):
             "bisect",
             "copy",
             "hashlib",
-        )
-
-        self._DEL_MODULES: Final = ("os", "sys", "posix", "gc")
+        ]
+        self._DEL_MODULES: Final = ["os", "sys", "posix", "gc"]
         self._BANNED_BUILTINS: Final = [
             "reload",
             "open",
@@ -592,7 +597,7 @@ class Controller(Generic[_T]):
         self._exit_context()
         self._post_process()
 
-    def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
+    def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
         """
         run the internal runner
         :param args: runner args
@@ -606,8 +611,8 @@ class Controller(Generic[_T]):
             result = self._runner(*args, **kwargs)
         except Exception:
             self._logger.debug("unknown exception occurs in execution")
-            self._logger.error(format_exc())
-            result = None
+            result = ErrorResult(format_exc())
+            self._logger.error(result.error_traceback)
 
         self._logger.debug("finished runner")
         return result
@@ -625,7 +630,7 @@ class Controller(Generic[_T]):
         """
         return self(*args, **kwargs)
 
-    def main(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | None:
+    def main(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
         """
         The main function to be called
         :param args:
