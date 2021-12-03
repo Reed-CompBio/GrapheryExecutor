@@ -44,7 +44,7 @@ from platform import platform
 
 _PLATFORM_STR = platform()
 
-__all__ = ["Controller", "GraphController"]
+__all__ = ["Controller", "GraphController", "ErrorResult", "LayerContext"]
 
 LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
 
@@ -240,10 +240,8 @@ class Controller(Generic[_T]):
         :param default_settings:
         :param options:
         :param logger:
-        :param is_local:
         :param custom_ns:
         :param controller:
-        :param re_cpu_time:
         :param stdout:
         :param stderr:
         :param kwargs:
@@ -643,6 +641,14 @@ class Controller(Generic[_T]):
 
     # ===== main fn end =====
     @property
+    def stdout(self):
+        return self._stdout
+
+    @property
+    def stderr(self):
+        return self._stderr
+
+    @property
     def stdout_redirector(self):
         return self._stdout_redirector
 
@@ -688,6 +694,7 @@ class GraphController(Controller):
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultENVVars = DefaultENVVars,
         options: Mapping = None,
+        **kwargs,
     ) -> None:
         super().__init__(
             runner=self._graph_runner,
@@ -695,6 +702,7 @@ class GraphController(Controller):
             context_layers=context_layers,
             default_settings=default_settings,
             options=options,
+            **kwargs,
         )
 
         # collect basic data

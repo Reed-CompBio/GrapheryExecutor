@@ -1,4 +1,7 @@
+import io
+import sys
 from copy import deepcopy
+from textwrap import dedent
 from typing import Type
 
 import pytest
@@ -13,6 +16,12 @@ def make_test_controller_instance(ctrl_cls, **kwargs):
     ctrl = ctrl_cls(**kwargs).init()
     ctrl._is_local = True
     return ctrl
+
+
+def assert_no_error(res):
+    if isinstance(res, ErrorResult):
+        raise ValueError(res.error_traceback)
+    return True
 
 
 class TestGraphController:
@@ -71,7 +80,74 @@ class TestGraphController:
             self.controller, code=code, graph_data=graph_data
         )
         result = ctrl.main()
-        assert not isinstance(result, ErrorResult) and isinstance(result, list)
+        assert assert_no_error(result) and isinstance(result, list)
+
+    def test_out_fd_capture(self):
+        intended_result = dedent(
+            """\
+            this is the capture test
+            this is also some test
+            """
+        )
+        code = "\n".join(
+            f"print('{line}')" for line in intended_result.split("\n") if line.strip()
+        )
+        graph_data = {}
+        ctrl = make_test_controller_instance(
+            self.controller,
+            code=code,
+            graph_data=graph_data,
+            custom_ns={"var1": 1, "var2": 2},
+        )
+        result = ctrl.main()
+        assert_no_error(result)
+        assert ctrl.stdout.getvalue() == intended_result
+
+    def test_custom_ns_import(self):
+        code = dedent(
+            """\
+            print(var1)
+            print(var2)
+            """
+        )
+        graph_data = {}
+        ctrl = make_test_controller_instance(
+            self.controller,
+            code=code,
+            graph_data=graph_data,
+            custom_ns={"var1": 1, "var2": 2},
+        )
+        result = ctrl.main()
+        assert_no_error(result)
+        assert ctrl.stdout.getvalue() == "1\n2\n"
+
+    def test_err_fd_capture(self):
+        intended_result = dedent(
+            """\
+            this is err test
+            this is also err test
+            """
+        )
+        code = "\n".join(
+            f"print('{line}', file=err)"
+            for line in intended_result.split("\n")
+            if line.strip()
+        )
+        graph_data = {}
+        err = io.StringIO()
+        ctrl = make_test_controller_instance(
+            self.controller,
+            code=code,
+            graph_data=graph_data,
+            stderr=err,
+            custom_ns={"err": err},
+        )
+        result = ctrl.main()
+        assert_no_error(result)
+        assert ctrl.stderr.getvalue() == intended_result
+
+    def test_options(self):
+        pass
 
     @pytest.mark.parametrize(
         "code, graph_data",
