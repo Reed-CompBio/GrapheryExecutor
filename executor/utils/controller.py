@@ -167,6 +167,8 @@ class Controller(Generic[_T]):
         # std
         self._stdout = options.get("stdout", StringIO())
         self._stderr = options.get("stderr", StringIO())
+        self._stdout_redirector = redirect_stdout(self._stdout)
+        self._stderr_redirector = redirect_stderr(self._stderr)
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -294,14 +296,16 @@ class Controller(Generic[_T]):
         set how the default file descriptors like stdout are channeled
         :return: None
         """
-        pass
+        self._stdout_redirector.__enter__()
+        self._stderr_redirector.__enter__()
 
     def _use_original_fd(self) -> None:
         """
         restore the default file descriptors
         :return: None
         """
-        pass
+        self._stdout_redirector.__exit__(None, None, None)
+        self._stderr_redirector.__exit__(None, None, None)
 
     # ===== global helpers end =====
 
@@ -677,11 +681,10 @@ class GraphController(Controller):
         Graphery graph runner
         :return: a list of execution records but None for now
         """
-        cmd = compile(self._code, _DEFAULT_FILE_NAME, "exec")
+        self._restrict_sandbox()
 
-        with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
-            self._restrict_sandbox()
-            exec(cmd, self._user_globals, self._user_globals)
+        cmd = compile(self._code, _DEFAULT_FILE_NAME, "exec")
+        exec(cmd, self._user_globals, self._user_globals)
 
         self._logger.debug(
             "executed successfully on \n"
