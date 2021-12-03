@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import abc
+import contextlib
+import random
 from copy import deepcopy, copy
 
 import sys as _sys
@@ -34,11 +37,12 @@ from traceback import format_exc
 
 try:
     import resource
-
-    resource_module_loaded = True
 except ImportError:
     resource = None
-    resource_module_loaded = False
+
+from platform import platform
+
+_PLATFORM_STR = platform()
 
 __all__ = ["Controller", "GraphController"]
 
@@ -84,9 +88,123 @@ def _builtins_iterator() -> Generator[tuple[str, Any], Any, None]:
         raise TypeError(f"Unknown __builtins__ type {type(__builtins__)}")
 
 
-# system stdout and stderr
-_ORIGINAL_STDOUT = _sys.stdout
-_ORIGINAL_STDERR = _sys.stderr
+class LayerContext(contextlib.AbstractContextManager):
+    def __init__(self, controller: Controller):
+        self._ctrl = controller
+
+    @abc.abstractmethod
+    def enter(self) -> None:
+        ...
+
+    @abc.abstractmethod
+    def exit(self) -> None:
+        ...
+
+    def __enter__(self):
+        self.enter()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.exit()
+
+
+class _FDRedirectLayer(LayerContext):
+    def enter(self):
+        self._ctrl.stdout_redirector.__enter__()
+        self._ctrl.stderr_redirector.__enter__()
+        self._ctrl.logger.debug("redirected stdout and stderr")
+
+    def exit(self) -> None:
+        self._ctrl.stdout_redirector.__exit__(None, None, None)
+        self._ctrl.stderr_redirector.__exit__(None, None, None)
+        self._ctrl.logger.debug("unredirected stdout and stderr")
+
+
+class _ModuleRestrict(LayerContext):
+    def enter(self) -> None:
+        if not self._ctrl.is_local:
+            # The posix module is a built-in and has a ton of OS access
+            # facilities ... if you delete those functions from
+            # sys.modules['posix'], it seems like they're gone EVEN IF
+            # someone else imports posix in a roundabout way. Of course,
+            # I don't know how foolproof this scheme is, though.
+            # (It's not sufficient to just "del sys.modules['posix']";
+            #  it can just be reimported without accessing an external
+            #  file and tripping RLIMIT_NOFILE, since the posix module
+            #  is baked into the python executable, ergh. Actually DON'T
+            #  "del sys.modules['posix']", since re-importing it will
+            #  refresh all of the attributes. ergh^2)
+            for a in dir(_sys.modules["posix"]):
+                delattr(_sys.modules["posix"], a)
+            del _sys.modules["posix"]
+
+            # do the same with os
+            for a in dir(_sys.modules["os"]):
+                # 'path' is needed for __restricted_import__ to work
+                # and 'stat' is needed for some errors to be reported properly
+                # and 'fspath' is needed for logging
+                if a not in ("path", "fspath", "stat", "PathLike", "_check_methods"):
+                    delattr(_sys.modules["os"], a)
+            # ppl can dig up trashed objects with gc.get_objects()
+            # noinspection PyUnresolvedReferences
+            import gc
+
+            for a in dir(_sys.modules["gc"]):
+                delattr(_sys.modules["gc"], a)
+            del _sys.modules["gc"]
+
+            # sys.modules contains an in-memory cache of already-loaded
+            # modules, so if you delete modules from here, they will
+            # need to be re-loaded from the filesystem.
+            #
+            # Thus, as an extra precaution, remove these modules so that
+            # they can't be re-imported without opening a new file,
+            # which is disallowed by resource.RLIMIT_NOFILE
+            #
+            # Of course, this isn't a foolproof solution by any means,
+            # and it might lead to UNEXPECTED FAILURES later in execution.
+            del _sys.modules["os"]
+            del _sys.modules["os.path"]
+            del _sys.modules["sys"]
+
+            self._ctrl.logger.debug("deleted dangerous modules")
+
+    def exit(self) -> None:
+        pass
+
+
+class _ResourceRestrict(LayerContext):
+    def enter(self) -> None:
+        if _PLATFORM_STR == "Linux" and resource is not None:
+            resource.setrlimit(
+                resource.RLIMIT_AS, (self._ctrl.re_mem_size, resource.RLIM_INFINITY)
+            )
+            self._ctrl.logger.debug(
+                f"set memory limit to {self._ctrl.re_mem_size} bytes"
+            )
+
+            resource.setrlimit(
+                resource.RLIMIT_CPU, (self._ctrl.re_cpu_time, resource.RLIM_INFINITY)
+            )
+            self._ctrl.logger.debug(
+                f"set cpu limit to {self._ctrl.re_cpu_time} seconds"
+            )
+
+    def exit(self) -> None:
+        if _PLATFORM_STR == "Linux" and resource is not None:
+            resource.setrlimit(
+                resource.RLIMIT_CPU, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+            )
+            self._ctrl.logger.debug(f"reset cpu limit")
+
+
+class _RandomContext(LayerContext):
+    def enter(self) -> None:
+        random.seed(self._ctrl.rand_seed)
+        self._ctrl.logger.debug(f"set random seed to {self._ctrl.rand_seed}")
+
+    def exit(self) -> None:
+        random.seed()
+        self._ctrl.logger.debug("reset random seed")
 
 
 class Controller(Generic[_T]):
@@ -94,12 +212,18 @@ class Controller(Generic[_T]):
     Controller class that controls the execution of some `runner` function
     """
 
-    _tracer = _tracer_cls
+    _DEFAULT_CONTEXT_LAYERS = [
+        _RandomContext,
+        _FDRedirectLayer,
+        _ModuleRestrict,
+        _ResourceRestrict,
+    ]
 
     def __init__(
         self,
         *,
         runner: Callable[_P, _T],
+        context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultENVVars,
         options: Mapping = None,
         **kwargs,
@@ -122,15 +246,19 @@ class Controller(Generic[_T]):
         options = {**(options or {}), **kwargs}
 
         # register logger
-        self._logger: Logger = options.get("logger", void_logger)
+        if options.get(DefaultVars.LOG_CMD_OUTPUT, True):
+            self._logger: Logger = options.get("logger", void_logger)
+        else:
+            self._logger = void_logger
 
         # register control layers
         self._init_layers: List[LAYER_TYPE] = [*self._make_init_layers()]
         self._logger.debug(f"registered init layers: {self._init_layers}")
-        self._prep_layers: List[LAYER_TYPE] = [*self._make_prep_layers()]
-        self._logger.debug(f"registered prep layers: {self._prep_layers}")
-        self._post_layers: List[LAYER_TYPE] = [*self._make_post_layers()]
-        self._logger.debug(f"registered post layers: {self._post_layers}")
+        self._context_layers: List[LayerContext] = [
+            *(layer(self) for layer in context_layers),
+            *(layer(self) for layer in self._DEFAULT_CONTEXT_LAYERS),
+        ]
+        self._logger.debug(f"registered context layers: {self._context_layers}")
 
         # register runner
         self._runner: Callable[_P, _T] = runner
@@ -140,29 +268,41 @@ class Controller(Generic[_T]):
         self._in_context: bool = False
 
         # local flag
-        self._is_local: bool = options.get("is_local", False)
+        self._is_local: bool = options.get(DefaultVars.IS_LOCAL, False)
 
         self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
 
         # sandbox
-        self._user_globals: Dict[str, Any] = {"__name__": _DEFAULT_MODULE_NAME}
+        self._user_globals: Dict[str, Any] = {}
 
         self._default_settings = default_settings
         self._logger.debug(f"controller uses settings {default_settings}")
+
         self._re_mem_size = options.get(
-            "re_mem_size",
+            DefaultVars.EXEC_MEM_OUT,
             self._default_settings[self._default_settings.EXEC_MEM_OUT],
         ) * int(
             10e6
         )  # convert mb to bytes
         self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
+
         self._re_cpu_time = options.get(
-            "re_cpu_time", self._default_settings[self._default_settings.EXEC_TIME_OUT]
+            DefaultVars.EXEC_TIME_OUT,
+            self._default_settings[self._default_settings.EXEC_TIME_OUT],
         )
         self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
-        # should always be false for now
-        self._use_pool = options.get("use_pool", False)
+        self._rand_seed = options.get(
+            DefaultVars.RAND_SEED, default_settings[DefaultVars.RAND_SEED]
+        )
+        self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
+
+        self._float_precision = options.get(
+            DefaultVars.FLOAT_PRECISION, default_settings[DefaultVars.FLOAT_PRECISION]
+        )
+        self._logger.debug(
+            f"float precision will be {self._float_precision} in execution"
+        )
 
         # std
         self._stdout = options.get("stdout", StringIO())
@@ -257,7 +397,7 @@ class Controller(Generic[_T]):
         def _err_fn(*_, **__):
             raise Exception(
                 f"'{fn}' is not supported by Executor. \n"
-                f"If you're using a local instance, please try to turn on is_local_flag \n"
+                f"If you're using a local instance, please try to turn on is_local_flag"
             )
 
         return _err_fn
@@ -286,26 +426,10 @@ class Controller(Generic[_T]):
                 "open() is not supported by Executor. \n"
                 "Instead use io.StringIO() to simulate a file. \n"
                 "Here is an example: https://goo.gl/uNvBGl \n"
-                "If you're using a local instance, please try to turn on is_local_flag \n"
+                "If you're using a local instance, please try to turn on is_local_flag"
             )
 
         return _open
-
-    def _channel_fd(self) -> None:
-        """
-        set how the default file descriptors like stdout are channeled
-        :return: None
-        """
-        self._stdout_redirector.__enter__()
-        self._stderr_redirector.__enter__()
-
-    def _use_original_fd(self) -> None:
-        """
-        restore the default file descriptors
-        :return: None
-        """
-        self._stdout_redirector.__exit__(None, None, None)
-        self._stderr_redirector.__exit__(None, None, None)
 
     # ===== global helpers end =====
 
@@ -331,13 +455,14 @@ class Controller(Generic[_T]):
                     _user_builtins[k] = self._create_raw_input
                 else:
                     _user_builtins[k] = v
-        self._user_globals["__builtins__"] = _user_builtins
+        self._update_globals("__builtins__", _user_builtins)
 
     def _collect_globals(self) -> None:
         """
         collect other specified namespace
         :return: None
         """
+        self._update_globals("__name__", _DEFAULT_MODULE_NAME)
         self._user_globals.update(copy(self._custom_ns))
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
@@ -349,7 +474,7 @@ class Controller(Generic[_T]):
         :return: None
         """
         self._user_globals[name] = val
-        self._logger.debug(f"updated global attr {name} with {val} ")
+        self._logger.debug(f"updated global attr '{name}' with {val} ")
 
     # ===== collect basic attrs end =====
 
@@ -372,91 +497,6 @@ class Controller(Generic[_T]):
 
     # ===== custom modules end =====
 
-    # ===== restrict sandbox =====
-    def _restrict_resources(self) -> None:
-        """
-        use resource library to restrict cpu and memory usage when the platform is Linux
-        :return: None
-        """
-        from platform import system
-
-        if system() == "Linux":
-            assert resource is not None
-            resource.setrlimit(
-                resource.RLIMIT_AS, (self._re_mem_size, self._re_cpu_time)
-            )
-            resource.setrlimit(
-                resource.RLIMIT_CPU, (self._re_cpu_time, self._re_cpu_time)
-            )
-        #
-        # # protect against unauthorized filesystem accesses ...
-        # resource.setrlimit(
-        #     resource.RLIMIT_NOFILE, (0, 0)
-        # )  # no opened files allowed
-
-        # VERY WEIRD. If you activate this resource limitation, it
-        # ends up generating an EMPTY trace for the following program:
-        #   "x = 0\nfor i in range(10):\n  x += 1\n   print x\n  x += 1\n"
-        # (at least on my Webfaction hosting with Python 2.7)
-        # resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))  # (redundancy for paranoia)
-
-    def _restrict_sandbox(self):
-        """
-        sandbox the execution environment by removing posix, os, os.path, sys
-        and use resources lib to restrict resource usages if possible
-        :return:
-        """
-        if resource_module_loaded and (not self._is_local):
-            self._restrict_resources()
-
-            # The posix module is a built-in and has a ton of OS access
-            # facilities ... if you delete those functions from
-            # sys.modules['posix'], it seems like they're gone EVEN IF
-            # someone else imports posix in a roundabout way. Of course,
-            # I don't know how foolproof this scheme is, though.
-            # (It's not sufficient to just "del sys.modules['posix']";
-            #  it can just be reimported without accessing an external
-            #  file and tripping RLIMIT_NOFILE, since the posix module
-            #  is baked into the python executable, ergh. Actually DON'T
-            #  "del sys.modules['posix']", since re-importing it will
-            #  refresh all of the attributes. ergh^2)
-            for a in dir(_sys.modules["posix"]):
-                delattr(_sys.modules["posix"], a)
-            del _sys.modules["posix"]
-
-            # do the same with os
-            for a in dir(_sys.modules["os"]):
-                # 'path' is needed for __restricted_import__ to work
-                # and 'stat' is needed for some errors to be reported properly
-                # and 'fspath' is needed for logging
-                if a not in ("path", "fspath", "stat", "PathLike", "_check_methods"):
-                    delattr(_sys.modules["os"], a)
-            # ppl can dig up trashed objects with gc.get_objects()
-            # noinspection PyUnresolvedReferences
-            import gc
-
-            for a in dir(_sys.modules["gc"]):
-                delattr(_sys.modules["gc"], a)
-            del _sys.modules["gc"]
-
-            # sys.modules contains an in-memory cache of already-loaded
-            # modules, so if you delete modules from here, they will
-            # need to be re-loaded from the filesystem.
-            #
-            # Thus, as an extra precaution, remove these modules so that
-            # they can't be re-imported without opening a new file,
-            # which is disallowed by resource.RLIMIT_NOFILE
-            #
-            # Of course, this isn't a foolproof solution by any means,
-            # and it might lead to UNEXPECTED FAILURES later in execution.
-            del _sys.modules["os"]
-            del _sys.modules["os.path"]
-            del _sys.modules["platform"]
-            # TODO remove Pool maybe?
-            del _sys.modules["sys"]
-
-    # ===== restrict sandbox end =====
-
     # ===== layer makers  =====
 
     @classmethod
@@ -465,27 +505,7 @@ class Controller(Generic[_T]):
         init layer maker, should be overwritten by subclasses if necessary
         :return: sequence of layer functions
         """
-        return ()
-
-    @classmethod
-    def _make_prep_layers(cls) -> Sequence[LAYER_TYPE]:
-        """
-        prep layer maker, should be overwritten by subclasses if necessary
-        :return: sequence of layer functions
-        """
-        return (
-            cls._collect_builtins,
-            cls._collect_globals,
-            cls._channel_fd,
-        )
-
-    @classmethod
-    def _make_post_layers(cls) -> Sequence[LAYER_TYPE]:
-        """
-        post layer maker, should be overwritten by subclasses if necessary
-        :return: sequence of layer functions
-        """
-        return (cls._use_original_fd,)
+        return (cls._collect_builtins, cls._collect_globals)
 
     # ===== layer makers end =====
 
@@ -505,8 +525,8 @@ class Controller(Generic[_T]):
         run prep layers
         :return: None
         """
-        for pre_fn in self._prep_layers:
-            pre_fn(self)
+        for layer in self._context_layers:
+            layer.enter()
         self._logger.debug("finished executing prep process")
 
     def _post_process(self) -> None:
@@ -514,9 +534,8 @@ class Controller(Generic[_T]):
         run post layers
         :return: None
         """
-        for post_fn in self._post_layers:
-            post_fn(self)
-
+        for layer in self._context_layers:
+            layer.exit()
         self._logger.debug("finished executing post process")
 
     # ===== processes end =====
@@ -581,17 +600,14 @@ class Controller(Generic[_T]):
         :return: whatever the runner returns
         """
         self._logger.debug(
-            "start runner with\n" f"args: {args}\n" f"and kwargs: {kwargs}\n"
+            "start runner with\n" f"args: {args}\n" f"and kwargs: {kwargs}"
         )
-        if self._use_pool:
-            raise ValueError("multiprocessing.Pool is not supported yet")
-        else:
-            try:
-                result = self._runner(*args, **kwargs)
-            except Exception:
-                self._logger.debug("unknown exception occurs in execution")
-                self._logger.error(format_exc())
-                result = None
+        try:
+            result = self._runner(*args, **kwargs)
+        except Exception:
+            self._logger.debug("unknown exception occurs in execution")
+            self._logger.error(format_exc())
+            result = None
 
         self._logger.debug("finished runner")
         return result
@@ -616,22 +632,44 @@ class Controller(Generic[_T]):
         :param kwargs:
         :return: whatever the runner returns
         """
-        self._logger.debug(
-            "started main with \n" f"args: {args}\n" f"kwargs: {kwargs}\n"
-        )
+        self._logger.debug("started main with \n" f"args: {args}\n" f"kwargs: {kwargs}")
         with self as ctrl:
             return ctrl._run(*args, **kwargs)
 
     # ===== main fn end =====
+    @property
+    def stdout_redirector(self):
+        return self._stdout_redirector
+
+    @property
+    def stderr_redirector(self):
+        return self._stderr_redirector
+
+    @property
+    def logger(self):
+        return self._logger
+
+    @property
+    def re_mem_size(self):
+        return self._re_mem_size
+
+    @property
+    def re_cpu_time(self):
+        return self._re_cpu_time
+
+    @property
+    def is_local(self):
+        return self._is_local
+
+    @property
+    def rand_seed(self):
+        return self._rand_seed
 
 
 class GraphController(Controller):
     """
     Graph controller for Graphery Executor
     """
-
-    _recorder_cls: Type = _recorder_cls
-    _tracer_cls: Type = _tracer_cls
 
     _graph_builder = nx.cytoscape_graph
 
@@ -642,9 +680,17 @@ class GraphController(Controller):
         graph_data: dict,
         graph: nx.Graph = None,
         logger: Logger = void_logger,
+        context_layers: Sequence[Type[LayerContext]] = (),
+        default_settings: DefaultENVVars = DefaultENVVars,
         options: Mapping = None,
     ) -> None:
-        super().__init__(runner=self._graph_runner, logger=logger, options=options)
+        super().__init__(
+            runner=self._graph_runner,
+            logger=logger,
+            context_layers=context_layers,
+            default_settings=default_settings,
+            options=options,
+        )
 
         # collect basic data
         self._code = code
@@ -681,8 +727,6 @@ class GraphController(Controller):
         Graphery graph runner
         :return: a list of execution records but None for now
         """
-        self._restrict_sandbox()
-
         cmd = compile(self._code, _DEFAULT_FILE_NAME, "exec")
         exec(cmd, self._user_globals, self._user_globals)
 
@@ -692,10 +736,10 @@ class GraphController(Controller):
             f"{self._code}\n"
             "```\n"
             "with globals \n"
-            f"{self._user_globals}\n"
+            f"{self._user_globals}"
         )
 
         result = self._recorder.final_change_list
-        self._logger.debug("final change list: \n" f"{result}\n")
+        self._logger.debug("final change list: \n" f"{result}")
 
         return result
