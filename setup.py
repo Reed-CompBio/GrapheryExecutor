@@ -9,9 +9,9 @@ def read_file(filename):
         return file.read()
 
 
-with open("executor/__init__.py") as fid:
+with open("executor/settings/variables.py") as fid:
     for line in fid:
-        if line.startswith("__version__"):
+        if line.startswith("SERVER_VERSION"):
             version = line.strip().split()[-1][1:-1]
             break
 
@@ -23,8 +23,11 @@ setuptools.setup(
     author="Larry Zeng",
     author_email="zengl@reed.edu",
     description="Graphery Executor",
+    install_requires=[
+        "networkg @ git+https://github.com/Reed-CompBio/networkx.git@networkg-2.6#egg=networkg"
+    ],
     entry_points={
-        "console_scripts": ["graphery_executor=executor.user_server:main"],
+        "console_scripts": ["graphery_executor=executor:main"],
     },
     long_description=read_file("README.md"),
     long_description_content_type="text/markdown",
@@ -39,5 +42,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )
