@@ -39,7 +39,7 @@ def run_server(setting: DefaultVars = DefaultVars) -> None:
         print(
             f"Request graph name: `{setting[setting.REQUEST_DATA_GRAPH_NAME]}`; \n"
             f"Request code name: `{setting[setting.REQUEST_DATA_CODE_NAME]}`; \n"
-            f"Request version name: `{setting[setting.REQUEST_DATA_VERSION_NAME]}`; "
+            f"Request options name: `{setting[setting.REQUEST_DATA_OPTIONS_NAME]}`; "
         )
         print("Settings: ")
         for k, v in setting.vars.items():

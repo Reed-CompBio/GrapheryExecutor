@@ -32,7 +32,7 @@ class DefaultVars(VarClass):
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
-    REQUEST_DATA_VERSION_NAME = "REQUEST_DATA_VERSION_NAME"
+    REQUEST_DATA_OPTIONS_NAME = "REQUEST_DATA_OPTIONS_NAME"
 
     vars = {
         SERVER_URL: "127.0.0.1",
@@ -46,7 +46,7 @@ class DefaultVars(VarClass):
         FLOAT_PRECISION: 4,
         REQUEST_DATA_CODE_NAME: "code",
         REQUEST_DATA_GRAPH_NAME: "graph",
-        REQUEST_DATA_VERSION_NAME: "version",
+        REQUEST_DATA_OPTIONS_NAME: "options",
     }
 
     server_shell_var = {
