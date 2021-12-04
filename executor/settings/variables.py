@@ -1,6 +1,6 @@
 from __future__ import annotations
-from os import getenv
-from typing import Type, TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
+from os import getenv as _getenv
+from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
 
 __all__ = ["VarClass", "DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
 
@@ -12,32 +12,17 @@ class VarClass(Protocol):
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
-    @classmethod
-    def read_from_env(cls, *args, use_default: bool = False) -> None:
+    def read_from_env(self, *args, use_default: bool = False) -> None:
         ...
 
 
 _T = TypeVar("_T", bound=VarClass)
 
 
-def _add_shell_env(cls: Type[_T]) -> Type[_T]:
-    added = {
-        f"{_ENV_PREFIX}{k}": f"{_ENV_PREFIX}{v}"
-        for k, v in cls.__dict__.items()
-        if k.isupper() and not k.startswith(_ENV_PREFIX)
-    }
-
-    for k, v in added.items():
-        setattr(cls, k, v)
-    return cls
-
-
-# Environment Variables
-@_add_shell_env
 class DefaultVars(VarClass):
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVE_PORT"
-    ALLOW_ORIGIN = "ALLOWED_ORIGIN"
+    ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
     EXEC_TIME_OUT = "EXEC_TIME_OUT"
     EXEC_MEM_OUT = "EXEC_MEM_OUT"
     LOG_CMD_OUTPUT = "LOG_CMD_OUTPUT"
@@ -45,16 +30,23 @@ class DefaultVars(VarClass):
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
 
+    REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
+    REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
+    REQUEST_DATA_VERSION_NAME = "REQUEST_DATA_VERSION_NAME"
+
     vars = {
         SERVER_URL: "127.0.0.1",
-        SERVER_PORT: "7590",
-        ALLOW_ORIGIN: False,
+        SERVER_PORT: 7590,
+        ALLOW_OTHER_ORIGIN: True,
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
         LOG_CMD_OUTPUT: True,
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
+        REQUEST_DATA_CODE_NAME: "code",
+        REQUEST_DATA_GRAPH_NAME: "graph",
+        REQUEST_DATA_VERSION_NAME: "version",
     }
 
     server_shell_var = {
@@ -76,9 +68,13 @@ class DefaultVars(VarClass):
                 "dest": SERVER_PORT,
             },
         ),
-        ALLOW_ORIGIN: (
+        ALLOW_OTHER_ORIGIN: (
             ("--allow-origin",),
-            {"default": vars[ALLOW_ORIGIN], "type": bool, "dest": ALLOW_ORIGIN},
+            {
+                "default": vars[ALLOW_OTHER_ORIGIN],
+                "type": bool,
+                "dest": ALLOW_OTHER_ORIGIN,
+            },
         ),
     }
     general_shell_var = {
@@ -108,22 +104,24 @@ class DefaultVars(VarClass):
         ),
     }
 
-    @classmethod
-    def read_from_env(
-        cls, *args, use_default: bool = False, all_arg: bool = False
-    ) -> None:
+    def __init__(self, **kwargs):
+        self.vars = {**self.vars, **kwargs}
+        self.read_from_env()
+
+    def __getitem__(self, item):
+        return self.vars[item]
+
+    def read_from_env(self, *args, all_arg: bool = False) -> None:
         if all_arg:
-            args = cls.vars.keys()
+            args = self.vars.keys()
 
         for env_name in args:
-            original = cls.vars[env_name]
+            shell_env_name = f"{_ENV_PREFIX}{env_name}"
+            original = self.vars[env_name]
             # type conversions from str to the proper type
             og_type = type(original)
 
-            if use_default:
-                cls.vars[env_name] = og_type(getenv(env_name, original))
-            else:
-                cls.vars[env_name] = og_type(getenv(env_name))
+            self.vars[env_name] = og_type(_getenv(shell_env_name, original))
 
     @classmethod
     def __class_getitem__(cls, item):
