@@ -2,7 +2,7 @@ from __future__ import annotations
 from os import getenv
 from typing import Type, TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
 
-__all__ = ["DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
+__all__ = ["VarClass", "DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
 
 _ENV_PREFIX = "GE_"
 
@@ -10,7 +10,7 @@ _ENV_PREFIX = "GE_"
 class VarClass(Protocol):
     vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
-    local_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
+    general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
     @classmethod
     def read_from_env(cls, *args, use_default: bool = False) -> None:
@@ -41,10 +41,9 @@ class DefaultVars(VarClass):
     EXEC_TIME_OUT = "EXEC_TIME_OUT"
     EXEC_MEM_OUT = "EXEC_MEM_OUT"
     LOG_CMD_OUTPUT = "LOG_CMD_OUTPUT"
-    IS_DEV = "IS_DEV"
-    DEFAULT_RAND_SEED = "DEFAULT_RAND_SEED"
-    DEFAULT_FLOAT_PRECISION = "DEFAULT_FLOAT_PRECISION"
-    ALLOW_BUILTIN_FUNCTIONS = "ALLOW_BUILTIN_FUNCTIONS"
+    IS_LOCAL = "IS_LOCAL"
+    RAND_SEED = "RAND_SEED"
+    FLOAT_PRECISION = "FLOAT_PRECISION"
 
     vars = {
         SERVER_URL: "127.0.0.1",
@@ -53,10 +52,9 @@ class DefaultVars(VarClass):
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
         LOG_CMD_OUTPUT: True,
-        IS_DEV: False,
-        DEFAULT_RAND_SEED: 0,
-        DEFAULT_FLOAT_PRECISION: 4,
-        ALLOW_BUILTIN_FUNCTIONS: False,
+        IS_LOCAL: False,
+        RAND_SEED: 0,
+        FLOAT_PRECISION: 4,
     }
 
     server_shell_var = {
@@ -66,6 +64,7 @@ class DefaultVars(VarClass):
                 "default": vars[SERVER_URL],
                 "type": str,
                 "help": "The url the local server will run on",
+                "dest": SERVER_URL,
             },
         ),
         SERVER_PORT: (
@@ -74,10 +73,40 @@ class DefaultVars(VarClass):
                 "default": vars[SERVER_PORT],
                 "type": int,
                 "help": "The port the local server will run on",
+                "dest": SERVER_PORT,
             },
         ),
+        ALLOW_ORIGIN: (
+            ("--allow-origin",),
+            {"default": vars[ALLOW_ORIGIN], "type": bool, "dest": ALLOW_ORIGIN},
+        ),
     }
-    local_shell_var = {}
+    general_shell_var = {
+        EXEC_TIME_OUT: (
+            ("-t", "--time-out"),
+            {"default": vars[EXEC_TIME_OUT], "type": int, "dest": EXEC_TIME_OUT},
+        ),
+        EXEC_MEM_OUT: (
+            ("-m", "--mem-out"),
+            {"default": vars[EXEC_MEM_OUT], "type": int, "dest": EXEC_MEM_OUT},
+        ),
+        IS_LOCAL: (
+            ("--local",),
+            {"default": vars[IS_LOCAL], "type": bool, "dest": IS_LOCAL},
+        ),
+        RAND_SEED: (
+            ("-s", "--rand-seed"),
+            {
+                "default": "0",
+                "type": lambda x: None if x.strip() == "None" else int(x),
+                "dest": RAND_SEED,
+            },
+        ),
+        FLOAT_PRECISION: (
+            ("--float-precision",),
+            {"default": 4, "type": int, "dest": FLOAT_PRECISION},
+        ),
+    }
 
     @classmethod
     def read_from_env(
