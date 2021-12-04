@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import contextlib
+import json
 import random
 from copy import deepcopy, copy
 
@@ -680,7 +681,7 @@ class Controller(Generic[_T]):
         return self._rand_seed
 
 
-class GraphController(Controller):
+class GraphController(Controller[List[MutableMapping]]):
     """
     Graph controller for Graphery Executor
     """
@@ -691,7 +692,7 @@ class GraphController(Controller):
         self,
         *,
         code: str,
-        graph_data: dict,
+        graph_data: dict | str,
         graph: nx.Graph = None,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultVars,
@@ -709,7 +710,7 @@ class GraphController(Controller):
         # collect basic data
         self._code = code
         self._graph_data = graph_data
-        self._graph = graph or self._graph_builder(graph_data)
+        self._graph = graph or self._build_graph(graph_data)
 
         # collect recorder and tracer
         self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
@@ -722,6 +723,17 @@ class GraphController(Controller):
             (_DEFAULT_MODULE_NAME, _DEFAULT_FILE_NAME),
             (_DEFAULT_FILE_NAME, self._code.splitlines()),
         )
+
+    @classmethod
+    def _build_graph(cls, graph_data: Dict | str) -> nx.Graph:
+        if isinstance(graph_data, str):
+            graph_data = json.loads(graph_data)
+        elif isinstance(graph_data, Dict):
+            pass
+        else:
+            raise ValueError("graph data has to be either str type or dict type")
+
+        return cls._graph_builder(graph_data)
 
     def _collect_globals(self) -> None:
         self._add_custom_module(nx, "nx", "networkx")
@@ -736,7 +748,7 @@ class GraphController(Controller):
         super(GraphController, self)._collect_globals()
 
     # TODO add option setter such as rand seed
-    def _graph_runner(self) -> list[MutableMapping]:
+    def _graph_runner(self) -> List[MutableMapping]:
         """
         Graphery graph runner
         :return: a list of execution records but None for now
