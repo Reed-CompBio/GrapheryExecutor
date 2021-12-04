@@ -1,4 +1,4 @@
-from .settings.variables import SERVER_VERSION
+from .settings import SERVER_VERSION
 from .utils.cli import main
 
 __version__ = SERVER_VERSION
