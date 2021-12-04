@@ -233,6 +233,7 @@ class Tracer:
     @classmethod
     def set_new_recorder(cls, recorder: Recorder) -> None:
         cls._recorder = recorder
+        cls._logger.debug(f"tracer cls sets recorder {recorder}")
 
     @classmethod
     def get_recorder_change_list(cls) -> List[Mapping]:
@@ -251,6 +252,7 @@ class Tracer:
         cls, key: Tuple[str, str], value: Tuple[str, List[str]]
     ) -> None:
         cls._additional_source[key] = value
+        cls._logger.debug(f"added additional code source for {key}: \n" f"{value}")
 
     def __call__(self, function_or_class):
         if DISABLED:
