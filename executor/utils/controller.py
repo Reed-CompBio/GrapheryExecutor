@@ -30,7 +30,7 @@ from contextlib import redirect_stdout, redirect_stderr
 from .logger import void_logger
 from .recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
-from ..settings import DefaultVars, DefaultENVVars
+from ..settings import DefaultVars
 
 import networkx as nx
 from traceback import format_exc
@@ -229,7 +229,7 @@ class Controller(Generic[_T]):
         *,
         runner: Callable[_P, _T],
         context_layers: Sequence[Type[LayerContext]] = (),
-        default_settings: DefaultVars = DefaultENVVars,
+        default_settings: DefaultVars = DefaultVars,
         options: Mapping = None,
         **kwargs,
     ) -> None:
@@ -694,7 +694,7 @@ class GraphController(Controller):
         graph_data: dict,
         graph: nx.Graph = None,
         context_layers: Sequence[Type[LayerContext]] = (),
-        default_settings: DefaultENVVars = DefaultENVVars,
+        default_settings: DefaultVars = DefaultVars,
         options: Mapping = None,
         **kwargs,
     ) -> None:
