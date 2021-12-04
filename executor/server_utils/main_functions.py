@@ -3,25 +3,20 @@ from __future__ import annotations
 import json
 from typing import Mapping, Callable, Any, List
 from wsgiref.simple_server import make_server
-from multiprocessing import Pool, TimeoutError
 
 from .params import (
-    TIMEOUT_SECONDS,
     ONLY_ACCEPTED_ORIGIN,
     ACCEPTED_ORIGIN,
     REQUEST_GRAPH_NAME,
     REQUEST_CODE_NAME,
     REQUEST_VERSION_NAME,
-    VERSION,
-    ENV_NAME_COLLECTION,
 )
 from .utils import (
     create_error_response,
     create_data_response,
-    execute,
-    ExecutionException,
-    ExecutionServerException,
 )
+from .. import SERVER_VERSION
+from ..settings import DefaultVars
 
 
 class StringEncoder(json.JSONEncoder):
@@ -32,26 +27,24 @@ class StringEncoder(json.JSONEncoder):
             return str(obj)
 
 
-def main(url: str, port: int) -> None:
+def run_server(setting: DefaultVars = DefaultVars) -> None:
+    url = setting[setting.SERVER_URL]
+    port = setting[setting.SERVER_PORT]
     with make_server(url, port, application) as httpd:
-        print(f"Server Ver: {VERSION}. Press <ctrl+c> to stop the server.")
+        print(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
         print(f"Ready for Python code on {url}:{port} ...")
-        print(f"Time out is set to {TIMEOUT_SECONDS}s.")
+        print(f"Time out is set to {setting[setting.EXEC_TIME_OUT]}s.")
+        print(f"Memory restriction is set to {setting[setting.EXEC_MEM_OUT]}s.")
+        print(f"Allow other origins? `{setting[setting.ALLOW_OTHER_ORIGIN]}`.")
         print(
-            f"The origin is `{ACCEPTED_ORIGIN}`. Accepting other origins too: {not ONLY_ACCEPTED_ORIGIN}"
+            f"Request graph name: `{setting[setting.REQUEST_DATA_GRAPH_NAME]}`; \n"
+            f"Request code name: `{setting[setting.REQUEST_DATA_CODE_NAME]}`; \n"
+            f"Request version name: `{setting[setting.REQUEST_DATA_VERSION_NAME]}`; "
         )
-        print(
-            f"Request graph name: `{REQUEST_GRAPH_NAME}`; request code name: `{REQUEST_CODE_NAME}`; "
-            f"request version name: `{REQUEST_VERSION_NAME}`;"
-        )
-        print("env:")
-        for env_name in ENV_NAME_COLLECTION:
-            print(env_name)
+        print("Settings: ")
+        for k, v in setting.vars.items():
+            print("{: <27}: {: <10}".format(k, v))
         httpd.serve_forever()
-
-
-def run_server(url: str, port: int) -> None:
-    main(url, port)
 
 
 def application(environ: Mapping, start_response: Callable) -> List:
@@ -92,37 +85,6 @@ def application(environ: Mapping, start_response: Callable) -> List:
     return [json.dumps(content, cls=StringEncoder).encode()]
 
 
-def time_out_execute(*args, **kwargs) -> Mapping:
-    with Pool(processes=1) as pool:
-        try:
-            result = pool.apply_async(func=execute, args=args, kwds=kwargs)
-
-            code_hash, exec_result = result.get(timeout=TIMEOUT_SECONDS)
-
-            response_dict = create_data_response(
-                {"codeHash": code_hash, "execResult": exec_result}
-            )
-        except TimeoutError:
-            response_dict = create_error_response(
-                f"Timeout: Code running timed out after {TIMEOUT_SECONDS}s."
-            )
-        except ExecutionException as e:
-            if e.empty:
-                response_dict = create_error_response(f"Unknown Exception: {e}")
-            else:
-                exec_info = e.related_exec_info[-1]
-                response_dict = create_error_response(
-                    f"{e}\n" + "At line {}: `{}`\n" "in {}".format(*exec_info)
-                )
-        except ExecutionServerException as e:
-            response_dict = create_error_response(f"Server Exception: {e}")
-        except Exception as e:
-            response_dict = create_error_response(f"Unknown Exception: {e}.")
-
-        print("Execution done.")
-    return response_dict
-
-
 def application_helper(environ: Mapping) -> Mapping:
     method = environ.get("REQUEST_METHOD")
     path = environ.get("PATH_INFO")
@@ -140,13 +102,16 @@ def application_helper(environ: Mapping) -> Mapping:
     request_json_object = json.loads(request_body)
     if (
         REQUEST_VERSION_NAME not in request_json_object
-        or request_json_object[REQUEST_VERSION_NAME] != VERSION
+        or request_json_object[REQUEST_VERSION_NAME] != SERVER_VERSION
     ):
         return create_error_response(
             "The current version of your local server (%s) does not match version of the web "
             'app ("%s"). Please download the newest version at '
             "https://github.com/FlickerSoul/Graphery/releases."
-            % (VERSION, request_json_object.get(REQUEST_VERSION_NAME, "Not Exist"))
+            % (
+                SERVER_VERSION,
+                request_json_object.get(REQUEST_VERSION_NAME, "Not Exist"),
+            )
         )
 
     if REQUEST_CODE_NAME not in request_json_object:
@@ -156,7 +121,4 @@ def application_helper(environ: Mapping) -> Mapping:
         return create_error_response("No Graph Intel Embedded In The Request.")
 
     # execute program with timed out
-    return time_out_execute(
-        code=request_json_object[REQUEST_CODE_NAME],
-        graph_json=request_json_object[REQUEST_GRAPH_NAME],
-    )
+    return None
