@@ -257,6 +257,7 @@ class Controller(Generic[_T]):
         # register control layers
         self._init_layers: List[LAYER_TYPE] = [*self._make_init_layers()]
         self._logger.debug(f"registered init layers: {self._init_layers}")
+
         self._context_layers: List[LayerContext] = [
             *(layer(self) for layer in context_layers),
             *(layer(self) for layer in self._DEFAULT_CONTEXT_LAYERS),
@@ -332,7 +333,7 @@ class Controller(Generic[_T]):
             "copy",
             "hashlib",
         ]
-        self._DEL_MODULES: Final = ["os", "sys", "posix", "gc"]
+        self._DEL_MODULES: Final = ["os", "sys", "posix", "gc", "_sys", "_os"]
         self._BANNED_BUILTINS: Final = [
             "reload",
             "open",
@@ -371,8 +372,10 @@ class Controller(Generic[_T]):
 
             importing_name = args[0]
 
-            if importing_name in self._custom_ns:
-                return self._custom_ns[importing_name]
+            if importing_name in self._custom_ns and isinstance(
+                result := self._custom_ns[importing_name], types.ModuleType
+            ):
+                return result
             elif importing_name in whitelisted_imports:
                 imported_mod = self._BUILTIN_IMPORT(*args)
 
@@ -690,7 +693,6 @@ class GraphController(Controller):
         code: str,
         graph_data: dict,
         graph: nx.Graph = None,
-        logger: Logger = void_logger,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultENVVars = DefaultENVVars,
         options: Mapping = None,
@@ -698,7 +700,6 @@ class GraphController(Controller):
     ) -> None:
         super().__init__(
             runner=self._graph_runner,
-            logger=logger,
             context_layers=context_layers,
             default_settings=default_settings,
             options=options,
@@ -711,7 +712,7 @@ class GraphController(Controller):
         self._graph = graph or self._graph_builder(graph_data)
 
         # collect recorder and tracer
-        self._recorder = _recorder_cls(graph=self._graph, logger=logger)
+        self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
         self._logger.debug("made new recorder")
 
         self._tracer = deepcopy(_tracer_cls)

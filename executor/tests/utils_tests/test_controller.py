@@ -1,13 +1,16 @@
 import io
-import sys
 from copy import deepcopy
+from logging import getLogger
+from operator import eq
 from textwrap import dedent
-from typing import Type
+from typing import Type, Callable
 
 import pytest
 from platform import platform
 
+from ...settings import DefaultVars
 from ...utils.controller import GraphController, ErrorResult
+from ...utils.logger import void_logger
 
 _platform = platform()
 
@@ -146,8 +149,81 @@ class TestGraphController:
         assert_no_error(result)
         assert ctrl.stderr.getvalue() == intended_result
 
-    def test_options(self):
-        pass
+    @pytest.mark.parametrize(
+        "options, attr_name, cmp_fn",
+        [
+            (
+                {**{n: getLogger("test_logger") for n in ["logger", "_logger"]}},
+                "_logger",
+                eq,
+            ),
+            (
+                {
+                    **{n: getLogger("test_logger") for n in ["logger", "_logger"]},
+                    DefaultVars.LOG_CMD_OUTPUT: False,
+                    "_logger": void_logger,
+                },
+                "_logger",
+                eq,
+            ),
+            (
+                {**{n: True for n in [DefaultVars.IS_LOCAL, "_is_local"]}},
+                "_is_local",
+                eq,
+            ),
+            (
+                {**{n: {"a": 1, "b": 2} for n in ["custom_ns", "_custom_ns"]}},
+                "_custom_ns",
+                lambda l, r: all(l[k] == v for k, v in r.items()),
+            ),
+            (
+                {**{n: 200 for n in [DefaultVars.EXEC_MEM_OUT, "_re_mem_size"]}},
+                "_re_mem_size",
+                lambda l, r: l == r * int(10e6),
+            ),
+            (
+                {**{n: 10 for n in [DefaultVars.EXEC_TIME_OUT, "_re_cpu_time"]}},
+                "_re_cpu_time",
+                eq,
+            ),
+            (
+                {**{n: 20 for n in [DefaultVars.RAND_SEED, "_rand_seed"]}},
+                "_rand_seed",
+                eq,
+            ),
+            (
+                {**{n: 10 for n in [DefaultVars.FLOAT_PRECISION, "_float_precision"]}},
+                "_float_precision",
+                eq,
+            ),
+            (
+                {**{n: v for v in [io.StringIO()] for n in ["stdout", "_stdout"]}},
+                "_stdout",
+                eq,
+            ),
+            (
+                {**{n: v for v in [io.StringIO()] for n in ["stderr", "_stderr"]}},
+                "_stderr",
+                eq,
+            ),
+        ],
+    )
+    def test_options(self, options: dict, attr_name: str, cmp_fn: Callable):
+        code = ""
+        graph_data = ""
+        ctrl = make_test_controller_instance(
+            self.controller, code=code, graph_data=graph_data, options=options
+        )
+        assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
+        result = ctrl.main()
+        assert_no_error(result)
+
+        ctrl = make_test_controller_instance(
+            self.controller, code=code, graph_data=graph_data, **options
+        )
+        assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
+        result = ctrl.main()
+        assert_no_error(result)
 
     @pytest.mark.parametrize(
         "code, graph_data",
