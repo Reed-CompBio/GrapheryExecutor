@@ -710,30 +710,51 @@ class GraphController(Controller[List[MutableMapping]]):
         # collect basic data
         self._code = code
         self._graph_data = graph_data
-        self._graph = graph or self._build_graph(graph_data)
+        self._graph: nx.Graph | None = None  # placeholder
 
         # collect recorder and tracer
-        self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
-        self._logger.debug("made new recorder")
+        self._recorder: _recorder_cls | None = None  # placeholder
+        self._tracer: _tracer_cls | None = None  # placeholder
 
+    def _build_graph(self) -> None:
+        if isinstance(self._graph_data, str):
+            self._logger.debug("treat graph data as json string")
+            self._graph_data = json.loads(self._graph_data)
+        elif isinstance(self._graph_data, Dict):
+            self._logger.debug("treat graph data as cyjs object")
+        else:
+            raise ValueError("graph data has to be either str type or dict type")
+
+        self._logger.debug(f"loaded graph data {self._graph_data}")
+        self._graph = self._graph_builder(self._graph_data)
+        self._logger.debug(f"made graph {self._graph}")
+
+    def _build_recorder(self) -> None:
+        if self._graph is None or not isinstance(self._graph, nx.Graph):
+            raise ValueError("initialization of recorder requires proper graph")
+        self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
+        self._logger.debug(f"made new recorder {self._recorder}")
+
+    def _build_tracer(self) -> None:
+        if self._recorder is None or not isinstance(self._recorder, _recorder_cls):
+            raise ValueError("initialization of tracer requires proper recorder")
         self._tracer = deepcopy(_tracer_cls)
+        self._logger.debug("made new tracer cls")
         self._tracer.set_new_recorder(self._recorder)
-        self._logger.debug("made new tracer and attached a recorder")
         self._tracer.set_additional_source(
             (_DEFAULT_MODULE_NAME, _DEFAULT_FILE_NAME),
             (_DEFAULT_FILE_NAME, self._code.splitlines()),
         )
 
     @classmethod
-    def _build_graph(cls, graph_data: Dict | str) -> nx.Graph:
-        if isinstance(graph_data, str):
-            graph_data = json.loads(graph_data)
-        elif isinstance(graph_data, Dict):
-            pass
-        else:
-            raise ValueError("graph data has to be either str type or dict type")
-
-        return cls._graph_builder(graph_data)
+    def _make_init_layers(cls) -> Sequence[LAYER_TYPE]:
+        base = super()._make_init_layers()
+        return (
+            cls._build_graph,
+            cls._build_recorder,
+            cls._build_tracer,
+            *base,
+        )
 
     def _collect_globals(self) -> None:
         self._add_custom_module(nx, "nx", "networkx")
