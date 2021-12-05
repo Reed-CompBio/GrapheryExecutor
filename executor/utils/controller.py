@@ -248,9 +248,13 @@ class Controller(Generic[_T]):
         :param kwargs:
         """
         options = {**(options or {}), **kwargs}
+        self._default_settings = default_settings
 
         # register logger
-        if options.get(DefaultVars.LOG_CMD_OUTPUT, True):
+        if options.get(
+            DefaultVars.LOG_CMD_OUTPUT,
+            default_settings[default_settings.LOG_CMD_OUTPUT],
+        ):
             self._logger: Logger = options.get("logger", void_logger)
         else:
             self._logger = void_logger
@@ -273,37 +277,39 @@ class Controller(Generic[_T]):
         self._in_context: bool = False
 
         # local flag
-        self._is_local: bool = options.get(DefaultVars.IS_LOCAL, False)
+        self._is_local: bool = options.get(
+            default_settings.IS_LOCAL, default_settings[default_settings.IS_LOCAL]
+        )
 
         self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
 
         # sandbox
         self._user_globals: Dict[str, Any] = {}
 
-        self._default_settings = default_settings
         self._logger.debug(f"controller uses settings {default_settings}")
 
         self._re_mem_size = options.get(
-            DefaultVars.EXEC_MEM_OUT,
-            self._default_settings[self._default_settings.EXEC_MEM_OUT],
+            default_settings.EXEC_MEM_OUT,
+            default_settings[default_settings.EXEC_MEM_OUT],
         ) * int(
             10e6
         )  # convert mb to bytes
         self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
 
         self._re_cpu_time = options.get(
-            DefaultVars.EXEC_TIME_OUT,
-            self._default_settings[self._default_settings.EXEC_TIME_OUT],
+            default_settings.EXEC_TIME_OUT,
+            default_settings[default_settings.EXEC_TIME_OUT],
         )
         self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
         self._rand_seed = options.get(
-            DefaultVars.RAND_SEED, default_settings[DefaultVars.RAND_SEED]
+            default_settings.RAND_SEED, default_settings[default_settings.RAND_SEED]
         )
         self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
 
         self._float_precision = options.get(
-            DefaultVars.FLOAT_PRECISION, default_settings[DefaultVars.FLOAT_PRECISION]
+            default_settings.FLOAT_PRECISION,
+            default_settings[default_settings.FLOAT_PRECISION],
         )
         self._logger.debug(
             f"float precision will be {self._float_precision} in execution"
@@ -693,7 +699,6 @@ class GraphController(Controller[List[MutableMapping]]):
         *,
         code: str,
         graph_data: dict | str,
-        graph: nx.Graph = None,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultVars,
         options: Mapping = None,
@@ -722,11 +727,19 @@ class GraphController(Controller[List[MutableMapping]]):
             self._graph_data = json.loads(self._graph_data)
         elif isinstance(self._graph_data, Dict):
             self._logger.debug("treat graph data as cyjs object")
+        elif isinstance(self._graph_data, nx.Graph):
+            self._logger.debug("treat graph data as networkx graph")
         else:
-            raise ValueError("graph data has to be either str type or dict type")
+            raise ValueError(
+                "graph data has to be either str type, dict type, or a graph instance"
+            )
 
         self._logger.debug(f"loaded graph data {self._graph_data}")
-        self._graph = self._graph_builder(self._graph_data)
+        self._graph = (
+            self._graph_data
+            if isinstance(self._graph_data, nx.Graph)
+            else self._graph_builder(self._graph_data)
+        )
         self._logger.debug(f"made graph {self._graph}")
 
     def _build_recorder(self) -> None:
