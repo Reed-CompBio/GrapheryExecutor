@@ -19,8 +19,11 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
 
     # local parser
     local_parser = exec_parser_group.add_parser("local")
-    local_parser.add_argument("code")
-    local_parser.add_argument("graph")
+    local_parser.add_argument(settings[settings.REQUEST_DATA_CODE_NAME])
+    local_parser.add_argument(settings[settings.REQUEST_DATA_GRAPH_NAME])
+    local_parser.add_argument(
+        settings[settings.REQUEST_DATA_OPTIONS_NAME], default={}, required=False
+    )
 
     # options for all
     for name, (arg, kwargs) in settings.general_shell_var.items():
