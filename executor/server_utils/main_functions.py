@@ -74,7 +74,7 @@ class ExecutorWSGIServer(WSGIServer):
                 formatter.add_info(data=self.application_helper(environ))
             except ExecutionError as e:
                 formatter.add_error(
-                    message=f"Something wrong happens in you're code. Details: ",
+                    message=f"Something wrong happens in you're code. Details: {e}",
                     traceback=e.traceback,
                 )
             except ArgumentError as e:
@@ -103,6 +103,7 @@ class ExecutorWSGIServer(WSGIServer):
         method: str = environ.get("REQUEST_METHOD")
         path: str = environ.get("PATH_INFO")
 
+        # TODO restrict info page
         # info page
         if method == "GET" and path == "/env":
             return environ
@@ -117,7 +118,7 @@ class ExecutorWSGIServer(WSGIServer):
         return self.execute(request_body)
 
     def execute(self, config_str: str) -> List[Mapping]:
-        # TODO fix this; don't use str literal; use stdin for arg parsing maybe? (yeah probably a good idea)
+        # TODO fix this; don't use str literal
         proc = subprocess.Popen(
             "graphery_executor local", stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
@@ -129,22 +130,17 @@ class ExecutorWSGIServer(WSGIServer):
                 )
             except subprocess.TimeoutExpired:
                 proc.kill()
-                stdout, stderr = proc.communicate()
+                raise ExecutionError("Execution Timed out.")
+            else:
+                stdout, stderr = stdout.decode(), stderr.decode()
+                try:
+                    res = json.loads(stdout)
+                except json.JSONDecodeError:
+                    raise ExecutionError(
+                        stdout[: stdout.index("\n")], f"{stdout}\n{stderr}"
+                    )
         except Exception as e:
-            raise ServerError(
-                f"unknown error happens when communicating with executor. Error: {e}"
-            )
-
-        stdout, stderr = stdout.decode(), stderr.decode()
-
-        try:
-            res = json.loads(stdout)
-        except json.JSONDecodeError:
-            raise ExecutionError(stdout[: stdout.index("\n")], f"{stdout}\n{stderr}")
-        except Exception as e:
-            raise ServerError(
-                f"unknown error happens when decoding stdout from executor. Error: {e}"
-            )
+            raise ServerError(f"unknown error happens during execution. Error: {e}")
         else:
             return res
 

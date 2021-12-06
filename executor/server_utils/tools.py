@@ -5,7 +5,7 @@ import json
 
 
 class ExecutionError(ValueError):
-    def __init__(self, msg: str, traceback: str):
+    def __init__(self, msg: str, traceback: str = None):
         super(ExecutionError, self).__init__(msg)
         self.traceback = traceback
 
