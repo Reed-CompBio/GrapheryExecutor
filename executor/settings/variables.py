@@ -2,31 +2,41 @@ from __future__ import annotations
 
 import json
 from os import getenv as _getenv
-from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
+from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final
 
 __all__ = [
     "VarClass",
     "DefaultVars",
     "SERVER_VERSION",
     "IDENTIFIER_SEPARATOR",
+    "INIT_ERROR_CODE",
+    "PREP_ERROR_CODE",
+    "POST_ERROR_CODE",
     "RUNNER_ERROR_CODE",
     "CPU_OUT_EXIT_CODE",
     "MEM_OUT_EXIT_CODE",
     "SHELL_PARSER_GROUP_NAME",
+    "SHELL_SERVER_PARSER_NAME",
+    "SHELL_LOCAL_PARSER_NAME",
 ]
 
-_ENV_PREFIX = "GE_"
+_ENV_PREFIX: Final[str] = "GE_"
 
 
 # Custom Variables
-SERVER_VERSION = "3.0.0a0"
-IDENTIFIER_SEPARATOR = "\u200b@"
+SERVER_VERSION: Final[str] = "3.0.0a0"
+IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 
-RUNNER_ERROR_CODE = 13
-CPU_OUT_EXIT_CODE = 17
-MEM_OUT_EXIT_CODE = 19
+INIT_ERROR_CODE: Final[int] = 5
+PREP_ERROR_CODE: Final[int] = 7
+POST_ERROR_CODE: Final[int] = 11
+RUNNER_ERROR_CODE: Final[int] = 13
+CPU_OUT_EXIT_CODE: Final[int] = 17
+MEM_OUT_EXIT_CODE: Final[int] = 19
 
-SHELL_PARSER_GROUP_NAME = "WHERE"
+SHELL_PARSER_GROUP_NAME: Final[str] = "WHERE"
+SHELL_SERVER_PARSER_NAME: Final[str] = "server"
+SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 
 # Shell Variables
