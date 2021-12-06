@@ -2,11 +2,29 @@ from __future__ import annotations
 from os import getenv as _getenv
 from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
 
-__all__ = ["VarClass", "DefaultVars", "SERVER_VERSION", "IDENTIFIER_SEPARATOR"]
+__all__ = [
+    "VarClass",
+    "DefaultVars",
+    "SERVER_VERSION",
+    "IDENTIFIER_SEPARATOR",
+    "RUNNER_ERROR_CODE",
+    "CPU_OUT_EXIT_CODE",
+    "MEM_OUT_EXIT_CODE",
+]
 
 _ENV_PREFIX = "GE_"
 
 
+# Custom Variables
+SERVER_VERSION = "3.0.0a0"
+IDENTIFIER_SEPARATOR = "\u200b@"
+
+RUNNER_ERROR_CODE = 13
+CPU_OUT_EXIT_CODE = 17
+MEM_OUT_EXIT_CODE = 19
+
+
+# Shell Variables
 class VarClass(Protocol):
     vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
@@ -19,16 +37,27 @@ class VarClass(Protocol):
 _T = TypeVar("_T", bound=VarClass)
 
 
+def _string_bool_parser(val: str) -> bool:
+    if val == "True" or val == "true" or val == "t":
+        return True
+    elif val == "False" or val == "false" or val == "f":
+        return False
+    else:
+        return bool(val)
+
+
 class DefaultVars(VarClass):
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVE_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
+
     EXEC_TIME_OUT = "EXEC_TIME_OUT"
     EXEC_MEM_OUT = "EXEC_MEM_OUT"
     LOG_CMD_OUTPUT = "LOG_CMD_OUTPUT"
     IS_LOCAL = "IS_LOCAL"
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
+    TARGET_VERSION = "TARGET_VERSION"
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
@@ -38,12 +67,15 @@ class DefaultVars(VarClass):
         SERVER_URL: "127.0.0.1",
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
+        #
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
         LOG_CMD_OUTPUT: True,
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
+        TARGET_VERSION: None,
+        #
         REQUEST_DATA_CODE_NAME: "code",
         REQUEST_DATA_GRAPH_NAME: "graph",
         REQUEST_DATA_OPTIONS_NAME: "options",
@@ -56,7 +88,6 @@ class DefaultVars(VarClass):
                 "default": vars[SERVER_URL],
                 "type": str,
                 "help": "The url the local server will run on",
-                "dest": SERVER_URL,
             },
         ),
         SERVER_PORT: (
@@ -65,7 +96,6 @@ class DefaultVars(VarClass):
                 "default": vars[SERVER_PORT],
                 "type": int,
                 "help": "The port the local server will run on",
-                "dest": SERVER_PORT,
             },
         ),
         ALLOW_OTHER_ORIGIN: (
@@ -73,34 +103,52 @@ class DefaultVars(VarClass):
             {
                 "default": vars[ALLOW_OTHER_ORIGIN],
                 "type": bool,
-                "dest": ALLOW_OTHER_ORIGIN,
             },
         ),
     }
     general_shell_var = {
+        LOG_CMD_OUTPUT: (
+            ("-o", "--log-out"),
+            {"default": vars[LOG_CMD_OUTPUT], "type": _string_bool_parser},
+        ),
         EXEC_TIME_OUT: (
             ("-t", "--time-out"),
-            {"default": vars[EXEC_TIME_OUT], "type": int, "dest": EXEC_TIME_OUT},
+            {
+                "default": vars[EXEC_TIME_OUT],
+                "type": int,
+            },
         ),
         EXEC_MEM_OUT: (
             ("-m", "--mem-out"),
-            {"default": vars[EXEC_MEM_OUT], "type": int, "dest": EXEC_MEM_OUT},
+            {
+                "default": vars[EXEC_MEM_OUT],
+                "type": int,
+            },
         ),
         IS_LOCAL: (
             ("--local",),
-            {"default": vars[IS_LOCAL], "type": bool, "dest": IS_LOCAL},
+            {
+                "default": vars[IS_LOCAL],
+                "type": bool,
+            },
         ),
         RAND_SEED: (
             ("-s", "--rand-seed"),
             {
-                "default": "0",
+                "default": str(vars[RAND_SEED]),
                 "type": lambda x: None if x.strip() == "None" else int(x),
-                "dest": RAND_SEED,
             },
         ),
         FLOAT_PRECISION: (
             ("--float-precision",),
-            {"default": 4, "type": int, "dest": FLOAT_PRECISION},
+            {
+                "default": vars[FLOAT_PRECISION],
+                "type": int,
+            },
+        ),
+        TARGET_VERSION: (
+            ("-t", "--target-version"),
+            {"default": vars[TARGET_VERSION], "type": str},
         ),
     }
 
@@ -126,8 +174,3 @@ class DefaultVars(VarClass):
     @classmethod
     def __class_getitem__(cls, item):
         return cls.vars[item]
-
-
-# Custom Variables
-SERVER_VERSION = "3.0.0a0"
-IDENTIFIER_SEPARATOR = "\u200b@"
