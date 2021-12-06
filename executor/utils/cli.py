@@ -34,3 +34,12 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
 def main() -> None:
     args = arg_parser()
     print(args)
+    # TODO cli main
+    # use fileinput on WHERE=local
+    # fileinput.input
+    # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list is empty.
+    # If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and openhook are
+    # ignored. To specify an alternative list of filenames, pass it as the first argument to input(). A single file
+    # name is also allowed.
+    #
+    # otherwise run server main
