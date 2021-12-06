@@ -224,33 +224,33 @@ class Tracer:
         self.recorder = type(self).get_recorder()
 
     @classmethod
-    def get_recorder(self) -> Recorder:
+    def get_recorder(cls) -> Recorder:
         if not cls._recorder:
             # For testing, Tracer should not create recorder by itself
             cls.set_new_recorder(Recorder())
         return cls._recorder
 
     @classmethod
-    def set_new_recorder(self, recorder: Recorder) -> None:
+    def set_new_recorder(cls, recorder: Recorder) -> None:
         cls._recorder = recorder
-        cls._logger.debug(f"tracer self sets recorder {recorder}")
+        cls._logger.debug(f"tracer cls sets recorder {recorder}")
 
     @classmethod
-    def get_recorder_change_list(self) -> List[Mapping]:
+    def get_recorder_change_list(cls) -> List[Mapping]:
         return cls.get_recorder().get_change_list()
 
     @classmethod
-    def set_logger(self, logger: Optional[logging.Logger]) -> None:
+    def set_logger(cls, logger: Optional[logging.Logger]) -> None:
         cls._logger = logger
-        cls._logger.debug(f"tracer self sets logger {logger}")
+        cls._logger.debug(f"tracer cls sets logger {logger}")
 
     @classmethod
-    def log_output(self, message: str) -> None:
+    def log_output(cls, message: str) -> None:
         cls._logger.info(message.rstrip())
 
     @classmethod
     def set_additional_source(
-        self, key: Tuple[str, str], value: Tuple[str, List[str]]
+        cls, key: Tuple[str, str], value: Tuple[str, List[str]]
     ) -> None:
         cls._additional_source[key] = value
         cls._logger.debug(f"added additional code source for {key}: \n" f"{value}")
@@ -268,7 +268,7 @@ class Tracer:
             return self._wrap_function(function_or_class)
 
     @classmethod
-    def look_at(self, func: FunctionType):
+    def look_at(cls, func: FunctionType):
         """
         look at function's output and record it in the change list
         @param func: wrapped function
@@ -282,7 +282,7 @@ class Tracer:
 
         return wrapper
 
-    def _wrap_class(self, self):
+    def _wrap_class(self, cls):
         for attr_name, attr in cls.__dict__.items():
             # Coroutines are functions, but snooping them is not supported
             # at the moment
