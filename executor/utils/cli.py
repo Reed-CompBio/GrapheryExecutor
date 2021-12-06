@@ -5,7 +5,11 @@ from typing import Mapping, Union
 
 from executor.server_utils.main_functions import run_server
 from executor.settings import DefaultVars
-from executor.settings.variables import SHELL_PARSER_GROUP_NAME
+from executor.settings.variables import (
+    SHELL_PARSER_GROUP_NAME,
+    SHELL_SERVER_PARSER_NAME,
+    SHELL_LOCAL_PARSER_NAME,
+)
 from executor.utils.controller import GraphController
 
 
@@ -18,12 +22,12 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
     )
 
     # server parser
-    server_parser = exec_parser_group.add_parser("server")
+    server_parser = exec_parser_group.add_parser(SHELL_SERVER_PARSER_NAME)
     for name, (arg, kwargs) in settings.server_shell_var.items():
         server_parser.add_argument(*arg, **kwargs, dest=name)
 
     # local parser
-    _ = exec_parser_group.add_parser("local")
+    _ = exec_parser_group.add_parser(SHELL_LOCAL_PARSER_NAME)
 
     # options for all
     for name, (arg, kwargs) in settings.general_shell_var.items():
@@ -37,29 +41,35 @@ def main() -> None:
     args = arg_parser()
     settings = DefaultVars(**args)  # make new settings based on input
 
-    match args[SHELL_PARSER_GROUP_NAME]:
-        case 'local':
-            # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list
-            # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
-            # openhook are ignored.
-            import fileinput
-            import json
-            request_obj: Mapping = json.loads(fileinput.input('-').readline())
-            code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
-            graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
-            options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+    group_name = args[SHELL_PARSER_GROUP_NAME]
+    if group_name == SHELL_LOCAL_PARSER_NAME:
+        # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list
+        # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
+        # openhook are ignored.
+        import fileinput
+        import json
 
-            ctrl = GraphController(code=code, graph_data=graph, default_settings=settings, options=options,)
+        request_obj: Mapping = json.loads(fileinput.input("-").readline())
+        code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
+        graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+        options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
 
-            # TODO error handling for init, main, and required args above
-            try:
-                ctrl.init()
-            except ValueError:
-                pass
+        ctrl = GraphController(
+            code=code,
+            graph_data=graph,
+            default_settings=settings,
+            options=options,
+        )
 
-            ctrl.main()
+        # TODO error handling for init, main, and required args above
+        try:
+            ctrl.init()
+        except ValueError:
+            pass
 
-        case 'server':
-            run_server(settings)
-        case _:
-            raise ValueError('unknown execution location')
+        ctrl.main()
+
+    elif group_name == SHELL_SERVER_PARSER_NAME:
+        run_server(settings)
+    else:
+        raise ValueError("unknown execution location")
