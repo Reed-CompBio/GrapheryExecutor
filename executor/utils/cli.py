@@ -14,7 +14,6 @@ from executor.settings.variables import (
 )
 from executor.utils.controller import (
     GraphController,
-    ControllerResultFormatter,
     ErrorResult,
 )
 
@@ -73,16 +72,16 @@ def main(settings: DefaultVars = DefaultVars, args: Sequence[str] = None) -> Non
 
         if isinstance(result, ErrorResult):
             # Ehhh ugly
-            ControllerResultFormatter.show_error(
+            ctrl.formatter.show_error(
                 result.exception,
                 trace=result.error_traceback,
                 error_code=RUNNER_ERROR_CODE,
             )
 
         try:
-            ControllerResultFormatter.show_result(json.dumps(result))
+            ctrl.formatter.show_result(json.dumps(result))
         except Exception as e:
-            ControllerResultFormatter.show_error(
+            ctrl.formatter.show_error(
                 ValueError(f"Server error when handling exec result. Error: {e}"),
                 error_code=CTRL_ERROR_CODE,
             )

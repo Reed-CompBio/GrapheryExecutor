@@ -190,43 +190,39 @@ class _ModuleRestrict(LayerContext):
 
 
 class ControllerResultFormatter:
-    _stdout = _sys.stdout
+    def __init__(self, output=_sys.stdout):
+        self._stdout = output
 
-    @classmethod
-    def write(cls, s: str) -> None:
-        cls._stdout.write(s)
+    def write(self, s: str) -> None:
+        self._stdout.write(s)
 
-    @classmethod
     def show_error(
-        cls, exception: Exception, trace: str = None, error_code: int = 1
+        self, exception: Exception, trace: str = None, error_code: int = 1
     ) -> NoReturn:
         from traceback import print_exc
 
-        cls.write(f"An error occurs with exit code {error_code}. Error: {exception}")
-        cls.write("traceback: ")
+        self.write(f"An error occurs with exit code {error_code}. Error: {exception}")
+        self.write("traceback: ")
         if trace:
             print(trace)
         else:
             print_exc()
         exit(error_code)
 
-    @classmethod
-    def show_result(cls, result: str) -> None:
-        cls.write(result)
+    def show_result(self, result: str) -> None:
+        self.write(result)
 
 
 class _ResourceRestrict(LayerContext):
-    @staticmethod
-    def _cpu_time_out_helper(sig_num, __):
-        ControllerResultFormatter.show_error(
+    def _cpu_time_out_helper(self, sig_num, __):
+        self._ctrl.formatter.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
             error_code=CPU_OUT_EXIT_CODE,
         )
 
-    @staticmethod
-    def _mem_consumed_helper(_, __):
-        ControllerResultFormatter.show_error(
-            ValueError(f"Allocated MEM size exhausted. Signal num: {signal}"),
+    def _mem_consumed_helper(self, sig_num, __):
+        self._ctrl.formatter.show_error(
+            ValueError(f"Allocated MEM size exhausted. Signal num: {sig_num}"),
             error_code=MEM_OUT_EXIT_CODE,
         )
 
@@ -384,6 +380,9 @@ class Controller(Generic[_T]):
         self._stderr = options.get("stderr", StringIO())
         self._stdout_redirector = redirect_stdout(self._stdout)
         self._stderr_redirector = redirect_stderr(self._stderr)
+
+        # formatter
+        self._formatter = options.get("formatter", ControllerResultFormatter())
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -654,7 +653,7 @@ class Controller(Generic[_T]):
         try:
             self._init_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, error_code=INIT_ERROR_CODE)
+            self._formatter.show_error(e, error_code=INIT_ERROR_CODE)
 
         return self
 
@@ -667,7 +666,7 @@ class Controller(Generic[_T]):
         try:
             self._prep_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, error_code=PREP_ERROR_CODE)
+            self._formatter.show_error(e, error_code=PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -682,7 +681,7 @@ class Controller(Generic[_T]):
         try:
             self._post_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, error_code=POST_ERROR_CODE)
+            self._formatter.show_error(e, error_code=POST_ERROR_CODE)
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
         """
@@ -769,6 +768,10 @@ class Controller(Generic[_T]):
     @property
     def rand_seed(self):
         return self._rand_seed
+
+    @property
+    def formatter(self):
+        return self._formatter
 
 
 class GraphController(Controller[List[MutableMapping]]):
