@@ -14,8 +14,8 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
 
     # server parser
     server_parser = exec_parser_group.add_parser("server")
-    for arg, kwargs in settings.server_shell_var.values():
-        server_parser.add_argument(*arg, **kwargs)
+    for name, (arg, kwargs) in settings.server_shell_var.items():
+        server_parser.add_argument(*arg, **kwargs, dest=name)
 
     # local parser
     local_parser = exec_parser_group.add_parser("local")
@@ -23,8 +23,8 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
     local_parser.add_argument("graph")
 
     # options for all
-    for arg, kwargs in settings.general_shell_var.values():
-        parser.add_argument(*arg, **kwargs)
+    for name, (arg, kwargs) in settings.general_shell_var.items():
+        parser.add_argument(*arg, **kwargs, dest=name)
 
     args: argparse.Namespace = parser.parse_args()
     return vars(args)
