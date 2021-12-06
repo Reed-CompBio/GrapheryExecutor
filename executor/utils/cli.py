@@ -9,8 +9,14 @@ from executor.settings.variables import (
     SHELL_PARSER_GROUP_NAME,
     SHELL_SERVER_PARSER_NAME,
     SHELL_LOCAL_PARSER_NAME,
+    RUNNER_ERROR_CODE,
+    CTRL_ERROR_CODE,
 )
-from executor.utils.controller import GraphController
+from executor.utils.controller import (
+    GraphController,
+    ControllerResultFormatter,
+    ErrorResult,
+)
 
 
 def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, str]]:
@@ -59,15 +65,25 @@ def main() -> None:
             graph_data=graph,
             default_settings=settings,
             options=options,
-        )
+        ).init()
 
-        # TODO error handling for init, main, and required args above
+        result = ctrl.main()
+
+        if isinstance(result, ErrorResult):
+            # Ehhh ugly
+            ControllerResultFormatter.show_error(
+                result.exception,
+                trace=result.error_traceback,
+                error_code=RUNNER_ERROR_CODE,
+            )
+
         try:
-            ctrl.init()
-        except ValueError:
-            pass
-
-        ctrl.main()
+            ControllerResultFormatter.show_result(json.dumps(result))
+        except Exception as e:
+            ControllerResultFormatter.show_error(
+                ValueError(f"Server error when handling exec result. Error: {e}"),
+                error_code=CTRL_ERROR_CODE,
+            )
 
     elif group_name == SHELL_SERVER_PARSER_NAME:
         run_server(settings)

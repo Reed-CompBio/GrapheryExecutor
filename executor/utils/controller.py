@@ -55,7 +55,13 @@ from platform import platform
 
 _PLATFORM_STR = platform()
 
-__all__ = ["Controller", "GraphController", "ErrorResult", "LayerContext"]
+__all__ = [
+    "Controller",
+    "GraphController",
+    "ErrorResult",
+    "LayerContext",
+    "ControllerResultFormatter",
+]
 
 LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
 
@@ -191,12 +197,17 @@ class ControllerResultFormatter:
         cls._stdout.write(s)
 
     @classmethod
-    def show_error(cls, exception: Exception, error_code: int = 1) -> NoReturn:
+    def show_error(
+        cls, exception: Exception, trace: str = None, error_code: int = 1
+    ) -> NoReturn:
         from traceback import print_exc
 
         cls.write(f"An error occurs with exit code {error_code}. Error: {exception}")
         cls.write("traceback: ")
-        print_exc()
+        if trace:
+            print(trace)
+        else:
+            print_exc()
         exit(error_code)
 
     @classmethod
@@ -209,14 +220,14 @@ class _ResourceRestrict(LayerContext):
     def _cpu_time_out_helper(sig_num, __):
         ControllerResultFormatter.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
-            CPU_OUT_EXIT_CODE,
+            error_code=CPU_OUT_EXIT_CODE,
         )
 
     @staticmethod
     def _mem_consumed_helper(_, __):
         ControllerResultFormatter.show_error(
             ValueError(f"Allocated MEM size exhausted. Signal num: {signal}"),
-            MEM_OUT_EXIT_CODE,
+            error_code=MEM_OUT_EXIT_CODE,
         )
 
     def enter(self) -> None:
@@ -643,7 +654,7 @@ class Controller(Generic[_T]):
         try:
             self._init_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, INIT_ERROR_CODE)
+            ControllerResultFormatter.show_error(e, error_code=INIT_ERROR_CODE)
 
         return self
 
@@ -656,7 +667,7 @@ class Controller(Generic[_T]):
         try:
             self._prep_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, PREP_ERROR_CODE)
+            ControllerResultFormatter.show_error(e, error_code=PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -671,7 +682,7 @@ class Controller(Generic[_T]):
         try:
             self._post_process()
         except Exception as e:
-            ControllerResultFormatter.show_error(e, POST_ERROR_CODE)
+            ControllerResultFormatter.show_error(e, error_code=POST_ERROR_CODE)
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
         """

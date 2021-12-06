@@ -9,6 +9,7 @@ __all__ = [
     "DefaultVars",
     "SERVER_VERSION",
     "IDENTIFIER_SEPARATOR",
+    "CTRL_ERROR_CODE",
     "INIT_ERROR_CODE",
     "PREP_ERROR_CODE",
     "POST_ERROR_CODE",
@@ -27,6 +28,7 @@ _ENV_PREFIX: Final[str] = "GE_"
 SERVER_VERSION: Final[str] = "3.0.0a0"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 
+CTRL_ERROR_CODE: Final[int] = 3
 INIT_ERROR_CODE: Final[int] = 5
 PREP_ERROR_CODE: Final[int] = 7
 POST_ERROR_CODE: Final[int] = 11
