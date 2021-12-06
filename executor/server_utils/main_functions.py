@@ -4,10 +4,9 @@ import json
 import subprocess
 import traceback
 from socketserver import BaseRequestHandler
-from typing import Mapping, Callable, Any, List, Dict
+from typing import Mapping, Callable, Any, List
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
 
-from networkx import Graph
 from .tools import (
     ServerError,
     ServerResultFormatter,
@@ -114,38 +113,19 @@ class ExecutorWSGIServer(WSGIServer):
 
         # get request content
         request_body = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
-        request_json_object: Mapping = json.loads(request_body)
 
-        if (
-            code_field_name := self.settings[self.settings.REQUEST_DATA_CODE_NAME]
-        ) not in request_json_object:
-            raise ArgumentError("No Code Snippets Embedded In The Request.")
-        else:
-            code = request_json_object.get(code_field_name)
+        return self.execute(request_body)
 
-        if (
-            graph_field_name := self.settings[self.settings.REQUEST_DATA_GRAPH_NAME]
-        ) not in request_json_object:
-            raise ArgumentError("No Graph Intel Embedded In The Request.")
-        else:
-            graph = request_json_object.get(graph_field_name)
-
-        options = request_json_object.get(
-            self.settings[self.settings.REQUEST_DATA_OPTIONS_NAME]
+    def execute(self, config_str: str) -> List[Mapping]:
+        # TODO fix this; don't use str literal; use stdin for arg parsing maybe? (yeah probably a good idea)
+        proc = subprocess.Popen(
+            "graphery_executor local", stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
-
-        return self.execute(code, graph, options)
-
-    def execute(
-        self, code: str, graph_data: str | Dict | Graph, options: Mapping = None
-    ) -> List[Mapping]:
-        options = options or {}
-        # TODO fix this
-        proc = subprocess.Popen("graphery_executor")
         try:
             try:
                 stdout, stderr = proc.communicate(
-                    timeout=self.settings[self.settings.EXEC_TIME_OUT]
+                    config_str.encode(),
+                    timeout=self.settings[self.settings.EXEC_TIME_OUT],
                 )
             except subprocess.TimeoutExpired:
                 proc.kill()
@@ -160,7 +140,7 @@ class ExecutorWSGIServer(WSGIServer):
         try:
             res = json.loads(stdout)
         except json.JSONDecodeError:
-            raise ExecutionError(stdout.split("\n")[0], f"{stdout}\n{stderr}")
+            raise ExecutionError(stdout[: stdout.index("\n")], f"{stdout}\n{stderr}")
         except Exception as e:
             raise ServerError(
                 f"unknown error happens when decoding stdout from executor. Error: {e}"
