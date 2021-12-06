@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import json
 from os import getenv as _getenv
 from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict
 
@@ -37,19 +39,11 @@ class VarClass(Protocol):
 _T = TypeVar("_T", bound=VarClass)
 
 
-def _string_bool_parser(val: str) -> bool:
-    if val == "True" or val == "true" or val == "t":
-        return True
-    elif val == "False" or val == "false" or val == "f":
-        return False
-    else:
-        return bool(val)
-
-
 class DefaultVars(VarClass):
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVE_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
+    ACCEPTED_ORIGINS = "ACCEPTED_ORIGINS"
 
     EXEC_TIME_OUT = "EXEC_TIME_OUT"
     EXEC_MEM_OUT = "EXEC_MEM_OUT"
@@ -67,6 +61,7 @@ class DefaultVars(VarClass):
         SERVER_URL: "127.0.0.1",
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
+        ACCEPTED_ORIGINS: ["127.0.0.1"],
         #
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
@@ -100,16 +95,17 @@ class DefaultVars(VarClass):
         ),
         ALLOW_OTHER_ORIGIN: (
             ("--allow-origin",),
-            {
-                "default": vars[ALLOW_OTHER_ORIGIN],
-                "type": bool,
-            },
+            {"default": vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
+        ),
+        ACCEPTED_ORIGINS: (
+            ("-o", "--origin"),
+            {"default": vars[ALLOW_OTHER_ORIGIN], "action": "append"},
         ),
     }
     general_shell_var = {
         LOG_CMD_OUTPUT: (
-            ("-o", "--log-out"),
-            {"default": vars[LOG_CMD_OUTPUT], "type": _string_bool_parser},
+            ("-l", "--log-out"),
+            {"default": vars[LOG_CMD_OUTPUT], "action": "store_true"},
         ),
         EXEC_TIME_OUT: (
             ("-t", "--time-out"),
@@ -147,7 +143,7 @@ class DefaultVars(VarClass):
             },
         ),
         TARGET_VERSION: (
-            ("-t", "--target-version"),
+            ("-v", "--target-version"),
             {"default": vars[TARGET_VERSION], "type": str},
         ),
     }
@@ -168,6 +164,8 @@ class DefaultVars(VarClass):
             original = self.vars[env_name]
             # type conversions from str to the proper type
             og_type = type(original)
+            if og_type is list:
+                og_type = json.loads
 
             self.vars[env_name] = og_type(_getenv(shell_env_name, original))
 
