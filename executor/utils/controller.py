@@ -4,6 +4,7 @@ import abc
 import contextlib
 import json
 import random
+import signal
 from copy import deepcopy, copy
 
 import sys as _sys
@@ -34,7 +35,9 @@ from ..seeker import tracer as _tracer_cls
 from ..settings import DefaultVars
 
 import networkx as nx
-from traceback import format_exc
+from traceback import format_exc, print_exc
+
+from ..settings.variables import CPU_OUT_EXIT_CODE, MEM_OUT_EXIT_CODE, SERVER_VERSION
 
 try:
     import resource
@@ -174,21 +177,35 @@ class _ModuleRestrict(LayerContext):
 
 
 class _ResourceRestrict(LayerContext):
+    @staticmethod
+    def _cpu_time_out_helper(_, __):
+        print("execution CPU timed out, stacktrace: ")
+        print_exc()
+        exit(CPU_OUT_EXIT_CODE)
+
+    @staticmethod
+    def _mem_consumed_helper(_, __):
+        print("execution MEM consumed, stacktrace: ")
+        print_exc(MEM_OUT_EXIT_CODE)
+
     def enter(self) -> None:
         if _PLATFORM_STR == "Linux" and resource is not None:
-            resource.setrlimit(
-                resource.RLIMIT_AS, (self._ctrl.re_mem_size, resource.RLIM_INFINITY)
-            )
-            self._ctrl.logger.debug(
-                f"set memory limit to {self._ctrl.re_mem_size} bytes"
-            )
-
+            signal.signal(signal.SIGXCPU, self._cpu_time_out_helper)
             resource.setrlimit(
                 resource.RLIMIT_CPU, (self._ctrl.re_cpu_time, resource.RLIM_INFINITY)
             )
             self._ctrl.logger.debug(
                 f"set cpu limit to {self._ctrl.re_cpu_time} seconds"
             )
+
+            signal.signal(signal.SIGSEGV, self._mem_consumed_helper)
+            resource.setrlimit(
+                resource.RLIMIT_AS, (self._ctrl.re_mem_size, resource.RLIM_INFINITY)
+            )
+            self._ctrl.logger.debug(
+                f"set memory limit to {self._ctrl.re_mem_size} bytes"
+            )
+            # https://man7.org/linux/man-pages/man2/getrlimit.2.html
 
     def exit(self) -> None:
         if _PLATFORM_STR == "Linux" and resource is not None:
@@ -249,6 +266,10 @@ class Controller(Generic[_T]):
         """
         options = {**(options or {}), **kwargs}
         self._default_settings = default_settings
+        self._target_version = options.get(
+            default_settings.TARGET_VERSION,
+            default_settings[default_settings.TARGET_VERSION],
+        )
 
         # register logger
         if options.get(
@@ -444,10 +465,19 @@ class Controller(Generic[_T]):
 
         return _open
 
+    def _update_globals(self, name: str, val: Any) -> None:
+        """
+        update globals namespace with name and val
+        :param name: the name
+        :param val: the value
+        :return: None
+        """
+        self._user_globals[name] = val
+        self._logger.debug(f"updated global attr '{name}' with {val} ")
+
     # ===== global helpers end =====
 
-    # ===== collect basic attrs =====
-
+    # ===== init section=====
     def _collect_builtins(self) -> None:
         """
         create a custom builtins dictionary for later execution and append it to the global dict
@@ -479,17 +509,13 @@ class Controller(Generic[_T]):
         self._user_globals.update(copy(self._custom_ns))
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
-    def _update_globals(self, name: str, val: Any) -> None:
-        """
-        update globals namespace with name and val
-        :param name: the name
-        :param val: the value
-        :return: None
-        """
-        self._user_globals[name] = val
-        self._logger.debug(f"updated global attr '{name}' with {val} ")
+    def _check_version(self) -> None:
+        if self._target_version != SERVER_VERSION:
+            raise ValueError(
+                f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
+            )
 
-    # ===== collect basic attrs end =====
+    # ===== init end end =====
 
     # ===== custom modules =====
     @staticmethod
@@ -518,7 +544,7 @@ class Controller(Generic[_T]):
         init layer maker, should be overwritten by subclasses if necessary
         :return: sequence of layer functions
         """
-        return (cls._collect_builtins, cls._collect_globals)
+        return (cls._check_version, cls._collect_builtins, cls._collect_globals)
 
     # ===== layer makers end =====
 
