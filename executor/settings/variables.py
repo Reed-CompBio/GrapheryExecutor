@@ -39,7 +39,38 @@ class VarClass(Protocol):
 _T = TypeVar("_T", bound=VarClass)
 
 
-class DefaultVars(VarClass):
+class _DefaultVarsFields(Protocol):
+    SERVER_URL: ClassVar[str]
+    SERVER_PORT: ClassVar[str]
+    ALLOW_OTHER_ORIGIN: ClassVar[str]
+    ACCEPTED_ORIGINS: ClassVar[str]
+
+    EXEC_TIME_OUT: ClassVar[str]
+    EXEC_MEM_OUT: ClassVar[str]
+    LOG_CMD_OUTPUT: ClassVar[str]
+    IS_LOCAL: ClassVar[str]
+    RAND_SEED: ClassVar[str]
+    FLOAT_PRECISION: ClassVar[str]
+    TARGET_VERSION: ClassVar[str]
+
+    REQUEST_DATA_CODE_NAME: ClassVar[str]
+    REQUEST_DATA_GRAPH_NAME: ClassVar[str]
+    REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
+
+
+class _VarGetter(_DefaultVarsFields):
+    def __init__(self, storage: VarClass) -> None:
+        self._storage = storage
+
+    def __getattr__(self, item):
+        if item not in self._storage.vars:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{item}'"
+            )
+        return self._storage.vars[item]
+
+
+class DefaultVars(_DefaultVarsFields, VarClass):
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVE_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
@@ -151,6 +182,7 @@ class DefaultVars(VarClass):
     def __init__(self, **kwargs):
         self.vars = {**self.vars, **kwargs}
         self.read_from_env()
+        self.v = _VarGetter(self)
 
     def __getitem__(self, item):
         return self.vars[item]
@@ -168,6 +200,16 @@ class DefaultVars(VarClass):
                 og_type = json.loads
 
             self.vars[env_name] = og_type(_getenv(shell_env_name, original))
+
+    @classmethod
+    def get_var_arg_name(cls, var_field: str) -> str:
+        if var_field in cls.server_shell_var:
+            store = cls.server_shell_var
+        elif var_field in cls.general_shell_var:
+            store = cls.general_shell_var
+        else:
+            raise ValueError(f"unknown arg name {var_field}")
+        return store[var_field][0][0]
 
     @classmethod
     def __class_getitem__(cls, item):
