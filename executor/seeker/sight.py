@@ -242,6 +242,7 @@ class Tracer:
     @classmethod
     def set_logger(cls, logger: Optional[logging.Logger]) -> None:
         cls._logger = logger
+        cls._logger.debug(f"tracer cls sets logger {logger}")
 
     @classmethod
     def log_output(cls, message: str) -> None:

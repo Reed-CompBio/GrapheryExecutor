@@ -817,7 +817,9 @@ class GraphController(Controller[List[MutableMapping]]):
 
     def _build_recorder(self) -> None:
         if self._graph is None or not isinstance(self._graph, nx.Graph):
-            raise ValueError("initialization of recorder requires proper graph")
+            from warnings import warn
+
+            warn("initialization of recorder requires proper graph")
         self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
         self._logger.debug(f"made new recorder {self._recorder}")
 
@@ -826,6 +828,7 @@ class GraphController(Controller[List[MutableMapping]]):
             raise ValueError("initialization of tracer requires proper recorder")
         self._tracer = deepcopy(_tracer_cls)
         self._logger.debug("made new tracer cls")
+        self._tracer.set_logger(self._logger)
         self._tracer.set_new_recorder(self._recorder)
         self._tracer.set_additional_source(
             (_DEFAULT_MODULE_NAME, _DEFAULT_FILE_NAME),
