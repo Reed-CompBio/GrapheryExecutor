@@ -8,7 +8,7 @@ from typing import Type, Callable
 import pytest
 from platform import platform
 
-from ...settings import DefaultVars
+from ...settings import DefaultVars, SERVER_VERSION
 from ...utils.controller import GraphController, ErrorResult
 from ...utils.logger import void_logger
 
@@ -16,7 +16,10 @@ _platform = platform()
 
 
 def make_test_controller_instance(ctrl_cls, **kwargs):
-    ctrl = ctrl_cls(**kwargs).init()
+    ctrl = ctrl_cls(
+        **kwargs,
+        **{DefaultVars.TARGET_VERSION: SERVER_VERSION},
+    ).init()
     ctrl._is_local = True
     return ctrl
 
@@ -210,7 +213,7 @@ class TestGraphController:
     )
     def test_options(self, options: dict, attr_name: str, cmp_fn: Callable):
         code = ""
-        graph_data = ""
+        graph_data = {}
         ctrl = make_test_controller_instance(
             self.controller, code=code, graph_data=graph_data, options=options
         )
