@@ -168,20 +168,9 @@ def run_server(settings: DefaultVars = DefaultVars) -> None:
         # ========== settings log
         print(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
         print(f"Ready for Python code on {url}:{port} ...")
-        print(f"Time out is set to {httpd.settings[httpd.settings.EXEC_TIME_OUT]}s.")
-        print(
-            f"Memory restriction is set to {httpd.settings[httpd.settings.EXEC_MEM_OUT]}s."
-        )
-        print(
-            f"Allow other origins? `{httpd.settings[httpd.settings.ALLOW_OTHER_ORIGIN]}`."
-        )
-        print(
-            f"Request graph name: `{httpd.settings[httpd.settings.REQUEST_DATA_GRAPH_NAME]}`; \n"
-            f"Request code name: `{httpd.settings[httpd.settings.REQUEST_DATA_CODE_NAME]}`; \n"
-            f"Request options name: `{httpd.settings[httpd.settings.REQUEST_DATA_OPTIONS_NAME]}`; "
-        )
         print("Settings: ")
         for k, v in httpd.settings.vars.items():
-            print("{: <27}: {: <10}".format(k, v))
+            print("{: <27}: {: <10}".format(k, str(v)))
         # ========== settings log end
+        print("Starting server...")
         httpd.serve_forever()
