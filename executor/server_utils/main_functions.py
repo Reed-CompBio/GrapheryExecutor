@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Callable, Any, List
-from wsgiref.simple_server import make_server
+import traceback
+from socketserver import BaseRequestHandler
+from typing import Mapping, Callable, Any, List, Iterable, Dict
+from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
 
-from .params import (
-    ONLY_ACCEPTED_ORIGIN,
-    ACCEPTED_ORIGIN,
-    REQUEST_GRAPH_NAME,
-    REQUEST_CODE_NAME,
-    REQUEST_VERSION_NAME,
-)
 from .tools import (
-    create_error_response,
-    create_data_response,
+    ServerError,
+    execute,
+    ServerResultFormatter,
+    ArgumentError,
 )
 from .. import SERVER_VERSION
 from ..settings import DefaultVars
@@ -27,23 +24,63 @@ class StringEncoder(json.JSONEncoder):
             return str(obj)
 
 
-def run_server(setting: DefaultVars = DefaultVars) -> None:
-    url = setting[setting.SERVER_URL]
-    port = setting[setting.SERVER_PORT]
-    with make_server(url, port, application) as httpd:
+class ExecutorWSGIServer(WSGIServer):
+    GE_SETTINGS_ENV_NAME = "GE_SETTINGS"
+
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        handler_cls: Callable[..., BaseRequestHandler],
+        settings: DefaultVars,
+        bind_and_activate=True,
+    ):
+        super().__init__(
+            server_address, handler_cls, bind_and_activate=bind_and_activate
+        )
+        self.settings = settings
+
+    def setup_environ(self) -> None:
+        super().setup_environ()
+        self.base_environ[self.GE_SETTINGS_ENV_NAME] = self.settings
+
+
+def make_server(
+    host: str,
+    port: int,
+    app: Callable[[Dict[str, Any], Callable], Iterable[bytes]],
+    settings: DefaultVars = DefaultVars,
+    server_class=ExecutorWSGIServer,
+    handler_class=WSGIRequestHandler,
+):
+    """Create a new WSGI server listening on `host` and `port` for `app` with `settings`"""
+    server = server_class((host, port), handler_class, settings)
+    server.set_app(app)
+    return server
+
+
+def run_server(settings: DefaultVars = DefaultVars) -> None:
+    url = settings[settings.SERVER_URL]
+    port = settings[settings.SERVER_PORT]
+    with make_server(url, port, application, settings) as httpd:
+        # ========== settings log
         print(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
         print(f"Ready for Python code on {url}:{port} ...")
-        print(f"Time out is set to {setting[setting.EXEC_TIME_OUT]}s.")
-        print(f"Memory restriction is set to {setting[setting.EXEC_MEM_OUT]}s.")
-        print(f"Allow other origins? `{setting[setting.ALLOW_OTHER_ORIGIN]}`.")
+        print(f"Time out is set to {httpd.settings[httpd.settings.EXEC_TIME_OUT]}s.")
         print(
-            f"Request graph name: `{setting[setting.REQUEST_DATA_GRAPH_NAME]}`; \n"
-            f"Request code name: `{setting[setting.REQUEST_DATA_CODE_NAME]}`; \n"
-            f"Request options name: `{setting[setting.REQUEST_DATA_OPTIONS_NAME]}`; "
+            f"Memory restriction is set to {httpd.settings[httpd.settings.EXEC_MEM_OUT]}s."
+        )
+        print(
+            f"Allow other origins? `{httpd.settings[httpd.settings.ALLOW_OTHER_ORIGIN]}`."
+        )
+        print(
+            f"Request graph name: `{httpd.settings[httpd.settings.REQUEST_DATA_GRAPH_NAME]}`; \n"
+            f"Request code name: `{httpd.settings[httpd.settings.REQUEST_DATA_CODE_NAME]}`; \n"
+            f"Request options name: `{httpd.settings[httpd.settings.REQUEST_DATA_OPTIONS_NAME]}`; "
         )
         print("Settings: ")
-        for k, v in setting.vars.items():
+        for k, v in httpd.settings.vars.items():
             print("{: <27}: {: <10}".format(k, v))
+        # ========== settings log end
         httpd.serve_forever()
 
 
@@ -66,59 +103,73 @@ def application(environ: Mapping, start_response: Callable) -> List:
         ),
     ]
 
+    settings: DefaultVars = environ.get(ExecutorWSGIServer.GE_SETTINGS_ENV_NAME)
+    formatter = ServerResultFormatter()
+
     # origin check
     origin = environ.get("HTTP_ORIGIN", "")
-    if ONLY_ACCEPTED_ORIGIN and origin.find(ACCEPTED_ORIGIN) == -1:
-        content = create_error_response(
-            f"The ORIGIN, {ACCEPTED_ORIGIN}, is not accepted."
+    allow_other_origin: bool = settings[settings.ACCEPTED_ORIGINS]
+    accepted_origin: List = settings[settings.ACCEPTED_ORIGINS]
+
+    if not allow_other_origin and accepted_origin.count(origin) == 0:
+        formatter.add_error(
+            message=f"The ORIGIN, {origin}, is not accepted.", traceback=None
         )
     else:
         try:
-            content = application_helper(environ)
+            formatter.add_info(data=application_helper(environ))
+        except ArgumentError as e:
+            formatter.add_error(
+                message=f"Wrong argument is passed. Error: {e}",
+                traceback=None,
+            )
+        except ServerError as e:
+            formatter.add_error(
+                message=f"Something wrong happens to the server. Please contact the website admin. Error: {e}",
+                traceback=traceback.format_exc(),
+            )
         except Exception as e:
-            content = create_error_response(
-                f"An exception occurs in the server. Error: {e}"
+            formatter.add_error(
+                message=f"An unknown exception occurs in the server. Error: {e}",
+                traceback=traceback.format_exc(),
             )
 
     headers.append(("Access-Control-Allow-Origin", origin))
     start_response(response_code, headers)
-    return [json.dumps(content, cls=StringEncoder).encode()]
+    return [json.dumps(formatter.format_server_result(), cls=StringEncoder).encode()]
 
 
-def application_helper(environ: Mapping) -> Mapping:
-    method = environ.get("REQUEST_METHOD")
-    path = environ.get("PATH_INFO")
+def application_helper(environ: Mapping) -> Mapping | List[Mapping]:
+    method: str = environ.get("REQUEST_METHOD")
+    path: str = environ.get("PATH_INFO")
+    settings: DefaultVars = environ.get(ExecutorWSGIServer.GE_SETTINGS_ENV_NAME)
 
     # info page
     if method == "GET" and path == "/env":
-        return create_data_response(environ)
+        return environ
 
     # entry point check
     if method != "POST" or path != "/run":
-        return create_error_response("Bad Request: Wrong Methods.")
+        raise ArgumentError("Bad Request: Wrong Methods.")
 
     # get request content
     request_body = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
-    request_json_object = json.loads(request_body)
+    request_json_object: Mapping = json.loads(request_body)
+
     if (
-        REQUEST_VERSION_NAME not in request_json_object
-        or request_json_object[REQUEST_VERSION_NAME] != SERVER_VERSION
-    ):
-        return create_error_response(
-            "The current version of your local server (%s) does not match version of the web "
-            'app ("%s"). Please download the newest version at '
-            "https://github.com/FlickerSoul/Graphery/releases."
-            % (
-                SERVER_VERSION,
-                request_json_object.get(REQUEST_VERSION_NAME, "Not Exist"),
-            )
-        )
+        code_field_name := settings[settings.REQUEST_DATA_CODE_NAME]
+    ) not in request_json_object:
+        raise ArgumentError("No Code Snippets Embedded In The Request.")
+    else:
+        code = request_json_object.get(code_field_name)
 
-    if REQUEST_CODE_NAME not in request_json_object:
-        return create_error_response("No Code Snippets Embedded In The Request.")
+    if (
+        graph_field_name := settings[settings.REQUEST_DATA_GRAPH_NAME]
+    ) not in request_json_object:
+        raise ArgumentError("No Graph Intel Embedded In The Request.")
+    else:
+        graph = request_json_object.get(graph_field_name)
 
-    if REQUEST_GRAPH_NAME not in request_json_object:
-        return create_error_response("No Graph Intel Embedded In The Request.")
+    options = request_json_object.get(settings[settings.REQUEST_DATA_OPTIONS_NAME])
 
-    # execute program with timed out
-    return None
+    return execute(code, graph, options)
