@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Mapping, Union
+from typing import Mapping, Union, Sequence
 
 from executor.server_utils.main_functions import run_server
 from executor.settings import DefaultVars
@@ -19,7 +19,9 @@ from executor.utils.controller import (
 )
 
 
-def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, str]]:
+def arg_parser(
+    settings: DefaultVars = DefaultVars, args: Sequence[str] = None
+) -> Mapping[str, Union[int, str]]:
     parser = argparse.ArgumentParser(
         prog="graphery_executor", description="Graphery Executor Server"
     )
@@ -39,12 +41,12 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
     for name, (arg, kwargs) in settings.general_shell_var.items():
         parser.add_argument(*arg, **kwargs, dest=name)
 
-    args: argparse.Namespace = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args(args)
     return vars(args)
 
 
-def main() -> None:
-    args = arg_parser()
+def main(settings: DefaultVars = DefaultVars, args: Sequence[str] = None) -> None:
+    args = arg_parser(settings, args)
     settings = DefaultVars(**args)  # make new settings based on input
 
     group_name = args[SHELL_PARSER_GROUP_NAME]
