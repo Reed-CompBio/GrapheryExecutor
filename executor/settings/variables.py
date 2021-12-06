@@ -67,7 +67,7 @@ class _VarGetter(_DefaultVarsFields):
             raise AttributeError(
                 f"'{self.__class__.__name__}' object has no attribute '{item}'"
             )
-        return self._storage.vars[item]
+        return self._storage[item]
 
 
 class DefaultVars(_DefaultVarsFields, VarClass):
