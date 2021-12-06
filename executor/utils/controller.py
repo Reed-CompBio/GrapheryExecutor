@@ -26,18 +26,25 @@ from typing import (
     MutableMapping,
     Final,
     Dict,
+    NoReturn,
 )
 from contextlib import redirect_stdout, redirect_stderr
 
 from .logger import void_logger
 from .recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
-from ..settings import DefaultVars
 
 import networkx as nx
-from traceback import format_exc, print_exc
 
-from ..settings.variables import CPU_OUT_EXIT_CODE, MEM_OUT_EXIT_CODE, SERVER_VERSION
+from ..settings import (
+    DefaultVars,
+    INIT_ERROR_CODE,
+    CPU_OUT_EXIT_CODE,
+    MEM_OUT_EXIT_CODE,
+    SERVER_VERSION,
+    POST_ERROR_CODE,
+    PREP_ERROR_CODE,
+)
 
 try:
     import resource
@@ -176,17 +183,41 @@ class _ModuleRestrict(LayerContext):
         pass
 
 
+class ControllerResultFormatter:
+    _stdout = _sys.stdout
+
+    @classmethod
+    def write(cls, s: str) -> None:
+        cls._stdout.write(s)
+
+    @classmethod
+    def show_error(cls, exception: Exception, error_code: int = 1) -> NoReturn:
+        from traceback import print_exc
+
+        cls.write(f"An error occurs with exit code {error_code}. Error: {exception}")
+        cls.write("traceback: ")
+        print_exc()
+        exit(error_code)
+
+    @classmethod
+    def show_result(cls, result: str) -> None:
+        cls.write(result)
+
+
 class _ResourceRestrict(LayerContext):
     @staticmethod
-    def _cpu_time_out_helper(_, __):
-        print("execution CPU timed out, stacktrace: ")
-        print_exc()
-        exit(CPU_OUT_EXIT_CODE)
+    def _cpu_time_out_helper(sig_num, __):
+        ControllerResultFormatter.show_error(
+            ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
+            CPU_OUT_EXIT_CODE,
+        )
 
     @staticmethod
     def _mem_consumed_helper(_, __):
-        print("execution MEM consumed, stacktrace: ")
-        print_exc(MEM_OUT_EXIT_CODE)
+        ControllerResultFormatter.show_error(
+            ValueError(f"Allocated MEM size exhausted. Signal num: {signal}"),
+            MEM_OUT_EXIT_CODE,
+        )
 
     def enter(self) -> None:
         if _PLATFORM_STR == "Linux" and resource is not None:
@@ -226,7 +257,8 @@ class _RandomContext(LayerContext):
 
 
 class ErrorResult:
-    def __init__(self, error_traceback: str):
+    def __init__(self, exception: Exception, error_traceback: str):
+        self.exception = exception
         self.error_traceback = error_traceback
 
 
@@ -608,7 +640,11 @@ class Controller(Generic[_T]):
         :param kwargs:
         :return: self
         """
-        self._init_process()
+        try:
+            self._init_process()
+        except Exception as e:
+            ControllerResultFormatter.show_error(e, INIT_ERROR_CODE)
+
         return self
 
     def __enter__(self) -> Controller[_T]:
@@ -617,7 +653,10 @@ class Controller(Generic[_T]):
         :return: None
         """
         self._enter_context()
-        self._prep_process()
+        try:
+            self._prep_process()
+        except Exception as e:
+            ControllerResultFormatter.show_error(e, PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -629,7 +668,10 @@ class Controller(Generic[_T]):
         :return: None
         """
         self._exit_context()
-        self._post_process()
+        try:
+            self._post_process()
+        except Exception as e:
+            ControllerResultFormatter.show_error(e, POST_ERROR_CODE)
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
         """
@@ -643,12 +685,17 @@ class Controller(Generic[_T]):
         )
         try:
             result = self._runner(*args, **kwargs)
-        except Exception:
+        except Exception as e:
+            # TODO hmmmm can we use formatter?
+            # but this is going to mess up the tests
+            from traceback import format_exc
+
             self._logger.debug("unknown exception occurs in execution")
-            result = ErrorResult(format_exc())
+            result = ErrorResult(e, format_exc())
             self._logger.error(result.error_traceback)
 
-        self._logger.debug("finished runner")
+        self._logger.debug("finished runner successfully")
+        # surprised https://youtrack.jetbrains.com/issue/PY-24273
         return result
 
     # ===== basic structures end =====
