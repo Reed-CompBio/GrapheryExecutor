@@ -6,4 +6,5 @@ from .variables import (
     RUNNER_ERROR_CODE,
     CPU_OUT_EXIT_CODE,
     MEM_OUT_EXIT_CODE,
+    SHELL_PARSER_GROUP_NAME,
 )

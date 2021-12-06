@@ -4,13 +4,16 @@ import argparse
 from typing import Mapping, Union
 
 from executor.settings import DefaultVars
+from executor.settings.variables import SHELL_PARSER_GROUP_NAME
 
 
 def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, str]]:
     parser = argparse.ArgumentParser(
         prog="graphery_executor", description="Graphery Executor Server"
     )
-    exec_parser_group = parser.add_subparsers(required=True)
+    exec_parser_group = parser.add_subparsers(
+        required=True, dest=SHELL_PARSER_GROUP_NAME
+    )
 
     # server parser
     server_parser = exec_parser_group.add_parser("server")
@@ -18,12 +21,7 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
         server_parser.add_argument(*arg, **kwargs, dest=name)
 
     # local parser
-    local_parser = exec_parser_group.add_parser("local")
-    local_parser.add_argument(settings[settings.REQUEST_DATA_CODE_NAME])
-    local_parser.add_argument(settings[settings.REQUEST_DATA_GRAPH_NAME])
-    local_parser.add_argument(
-        settings[settings.REQUEST_DATA_OPTIONS_NAME], default={}, required=False
-    )
+    _ = exec_parser_group.add_parser("local")
 
     # options for all
     for name, (arg, kwargs) in settings.general_shell_var.items():
