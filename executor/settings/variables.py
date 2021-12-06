@@ -32,7 +32,18 @@ class VarClass(Protocol):
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
+    def __getitem__(self, item: str):
+        ...
+
     def read_from_env(self, *args, use_default: bool = False) -> None:
+        ...
+
+    @classmethod
+    def get_var_arg_name(cls, var_field: str) -> str:
+        ...
+
+    @classmethod
+    def __class_getitem__(cls, item):
         ...
 
 
@@ -184,7 +195,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         self.read_from_env()
         self.v = _VarGetter(self)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str):
         return self.vars[item]
 
     def read_from_env(self, *args, all_arg: bool = False) -> None:
