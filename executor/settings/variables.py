@@ -147,6 +147,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             {"default": vars[ALLOW_OTHER_ORIGIN], "action": "append"},
         ),
     }
+    # TODO don't need default
     general_shell_var = {
         LOG_CMD_OUTPUT: (
             ("-l", "--log-out"),

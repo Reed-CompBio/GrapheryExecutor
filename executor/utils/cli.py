@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 from typing import Mapping, Union
 
+from executor.server_utils.main_functions import run_server
 from executor.settings import DefaultVars
 from executor.settings.variables import SHELL_PARSER_GROUP_NAME
+from executor.utils.controller import GraphController
 
 
 def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, str]]:
@@ -33,13 +35,31 @@ def arg_parser(settings: DefaultVars = DefaultVars) -> Mapping[str, Union[int, s
 
 def main() -> None:
     args = arg_parser()
-    print(args)
-    # TODO cli main
-    # use fileinput on WHERE=local
-    # fileinput.input
-    # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list is empty.
-    # If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and openhook are
-    # ignored. To specify an alternative list of filenames, pass it as the first argument to input(). A single file
-    # name is also allowed.
-    #
-    # otherwise run server main
+    settings = DefaultVars(**args)  # make new settings based on input
+
+    match args[SHELL_PARSER_GROUP_NAME]:
+        case 'local':
+            # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list
+            # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
+            # openhook are ignored.
+            import fileinput
+            import json
+            request_obj: Mapping = json.loads(fileinput.input('-').readline())
+            code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
+            graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+            options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+
+            ctrl = GraphController(code=code, graph_data=graph, default_settings=settings, options=options,)
+
+            # TODO error handling for init, main, and required args above
+            try:
+                ctrl.init()
+            except ValueError:
+                pass
+
+            ctrl.main()
+
+        case 'server':
+            run_server(settings)
+        case _:
+            raise ValueError('unknown execution location')
