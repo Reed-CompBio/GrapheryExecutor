@@ -31,7 +31,7 @@ class ServerResultFormatter:
         if self._errors is None:
             self._errors = []
 
-        if self._error_msg_checker(error_msg):
+        if not self._error_msg_valid(error_msg):
             raise ValueError("error message malformed")
 
         self._errors.append(error_msg)
@@ -42,14 +42,14 @@ class ServerResultFormatter:
         if self._info is None:
             self._info = []
 
-        if self._info_msg_checker(info_msg):
+        if not self._info_msg_valid(info_msg):
             raise ValueError("value message malformed")
 
         self._info.append(info_msg)
         return info_msg
 
-    def _error_msg_checker(self, error_msg: Dict) -> bool:
+    def _error_msg_valid(self, error_msg: Dict) -> bool:
         return True
 
-    def _info_msg_checker(self, info_msg: Dict) -> bool:
+    def _info_msg_valid(self, info_msg: Dict) -> bool:
         return True
