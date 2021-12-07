@@ -6,6 +6,7 @@ import traceback
 from socketserver import BaseRequestHandler
 from typing import Mapping, Callable, Any, List
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
+from shutil import which
 
 from .tools import (
     ServerError,
@@ -121,12 +122,16 @@ class ExecutorWSGIServer(WSGIServer):
     def _subprocess_command(self) -> str:
         # TODO fix this; don't use str literal
 
-        args = ["graphery_executor"]
-        for k, v in self.settings.general_shell_var.items():
+        proc_name = which("graphery_executor")
+        if proc_name is None:
+            raise ServerError("Cannot find executor program in system path")
+
+        args = [proc_name]
+        for k in self.settings.general_shell_var.keys():
             arg_name = self.settings.get_var_arg_name(k)
             args.append(arg_name)
             if self.settings.var_arg_has_value(k):
-                args.append(v)
+                args.append(str(self.settings[k]))
 
         args.append(SHELL_LOCAL_PARSER_NAME)
         return " ".join(args)
@@ -136,26 +141,23 @@ class ExecutorWSGIServer(WSGIServer):
             self._subprocess_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
         try:
-            try:
-                stdout, stderr = proc.communicate(
-                    config_str.encode(),
-                    timeout=self.settings[self.settings.EXEC_TIME_OUT],
-                )
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                raise ExecutionError("Execution Timed out.")
-            else:
-                stdout, stderr = stdout.decode(), stderr.decode()
-                try:
-                    res = json.loads(stdout)
-                except json.JSONDecodeError:
-                    raise ExecutionError(
-                        stdout[: stdout.index("\n")], f"{stdout}\n{stderr}"
-                    )
-        except Exception as e:
-            raise ServerError(f"unknown error happens during execution. Error: {e}")
+            stdout, stderr = proc.communicate(
+                config_str.encode(),
+                timeout=self.settings[self.settings.EXEC_TIME_OUT],
+            )
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise ExecutionError("Execution Timed out.")
         else:
-            return res
+            stdout, stderr = stdout.decode(), stderr.decode()
+            try:
+                res = json.loads(stdout)
+            except json.JSONDecodeError:
+                raise ExecutionError(
+                    stdout[: stdout.index("\n")], f"{stdout}\n{stderr}"
+                )
+
+        return res
 
 
 def make_server(
