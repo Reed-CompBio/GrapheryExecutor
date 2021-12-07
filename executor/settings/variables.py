@@ -236,5 +236,20 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         return store[var_field][0][0]
 
     @classmethod
+    def var_arg_has_value(cls, var_field: str) -> bool:
+        if var_field in cls.server_shell_var:
+            store = cls.server_shell_var
+        elif var_field in cls.general_shell_var:
+            store = cls.general_shell_var
+        else:
+            raise ValueError(f"unknown arg name {var_field}")
+
+        arg_options: Mapping = store[var_field][1]
+
+        if arg_options.get("action", None) == "store_true":
+            return False
+        return True
+
+    @classmethod
     def __class_getitem__(cls, item):
         return cls.vars[item]
