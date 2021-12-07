@@ -14,7 +14,7 @@ from .tools import (
     ExecutionError,
 )
 from .. import SERVER_VERSION
-from ..settings import DefaultVars
+from ..settings import DefaultVars, SHELL_LOCAL_PARSER_NAME
 
 
 class StringEncoder(json.JSONEncoder):
@@ -117,10 +117,23 @@ class ExecutorWSGIServer(WSGIServer):
 
         return self.execute(request_body)
 
-    def execute(self, config_str: str) -> List[Mapping]:
+    @property
+    def _subprocess_command(self) -> str:
         # TODO fix this; don't use str literal
+
+        args = ["graphery_executor"]
+        for k, v in self.settings.general_shell_var.items():
+            arg_name = self.settings.get_var_arg_name(k)
+            args.append(arg_name)
+            if self.settings.var_arg_has_value(k):
+                args.append(v)
+
+        args.append(SHELL_LOCAL_PARSER_NAME)
+        return " ".join(args)
+
+    def execute(self, config_str: str) -> List[Mapping]:
         proc = subprocess.Popen(
-            "graphery_executor local", stdin=subprocess.PIPE, stdout=subprocess.PIPE
+            self._subprocess_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
         try:
             try:
