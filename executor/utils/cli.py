@@ -44,49 +44,56 @@ def arg_parser(
     return vars(args)
 
 
+def _local_run(settings):
+    # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list
+    # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
+    # openhook are ignored.
+    import fileinput
+    import json
+
+    request_obj: Mapping = json.loads(fileinput.input("-").readline())
+    code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
+    graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+    options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+
+    ctrl = GraphController(
+        code=code,
+        graph_data=graph,
+        default_settings=settings,
+        options=options,
+    ).init()
+
+    result = ctrl.main()
+
+    if isinstance(result, ErrorResult):
+        # Ehhh ugly
+        ctrl.formatter.show_error(
+            result.exception,
+            trace=result.error_traceback,
+            error_code=RUNNER_ERROR_CODE,
+        )
+
+    try:
+        ctrl.formatter.show_result(json.dumps(result))
+    except Exception as e:
+        ctrl.formatter.show_error(
+            ValueError(f"Server error when handling exec result. Error: {e}"),
+            error_code=CTRL_ERROR_CODE,
+        )
+
+
+def _server_run(settings):
+    run_server(settings)
+
+
 def main(settings: DefaultVars = DefaultVars, args: Sequence[str] = None) -> None:
     args = arg_parser(settings, args)
     settings = DefaultVars(**args)  # make new settings based on input
 
     group_name = args[SHELL_PARSER_GROUP_NAME]
     if group_name == SHELL_LOCAL_PARSER_NAME:
-        # This iterates over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list
-        # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
-        # openhook are ignored.
-        import fileinput
-        import json
-
-        request_obj: Mapping = json.loads(fileinput.input("-").readline())
-        code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
-        graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
-        options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
-
-        ctrl = GraphController(
-            code=code,
-            graph_data=graph,
-            default_settings=settings,
-            options=options,
-        ).init()
-
-        result = ctrl.main()
-
-        if isinstance(result, ErrorResult):
-            # Ehhh ugly
-            ctrl.formatter.show_error(
-                result.exception,
-                trace=result.error_traceback,
-                error_code=RUNNER_ERROR_CODE,
-            )
-
-        try:
-            ctrl.formatter.show_result(json.dumps(result))
-        except Exception as e:
-            ctrl.formatter.show_error(
-                ValueError(f"Server error when handling exec result. Error: {e}"),
-                error_code=CTRL_ERROR_CODE,
-            )
-
+        _local_run(settings)
     elif group_name == SHELL_SERVER_PARSER_NAME:
-        run_server(settings)
+        _server_run(settings)
     else:
         raise ValueError("unknown execution location")

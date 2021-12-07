@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Iterable, Any
+from typing import List, Any
 
 from ...utils.cli import arg_parser
 from ...settings import DefaultVars, SHELL_SERVER_PARSER_NAME, SHELL_LOCAL_PARSER_NAME
