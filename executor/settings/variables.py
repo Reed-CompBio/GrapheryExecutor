@@ -156,7 +156,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         ),
         ACCEPTED_ORIGINS: (
             ("-o", "--origin"),
-            {"default": vars[ALLOW_OTHER_ORIGIN], "action": "append"},
+            {"default": vars[ACCEPTED_ORIGINS], "action": "append"},
         ),
     }
     # TODO don't need default
@@ -181,10 +181,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         ),
         IS_LOCAL: (
             ("--local",),
-            {
-                "default": vars[IS_LOCAL],
-                "type": bool,
-            },
+            {"default": vars[IS_LOCAL], "action": "store_true"},
         ),
         RAND_SEED: (
             ("-s", "--rand-seed"),
