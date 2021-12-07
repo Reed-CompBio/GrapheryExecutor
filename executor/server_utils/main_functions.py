@@ -160,25 +160,16 @@ class ExecutorWSGIServer(WSGIServer):
         return res
 
 
-def make_server(
-    host: str,
-    port: int,
-    settings: DefaultVars = DefaultVars,
-    server_class=ExecutorWSGIServer,
-    handler_class=WSGIRequestHandler,
-):
-    """Create a new WSGI server listening on `host` and `port` for `app` with `settings`"""
-    server = server_class((host, port), handler_class, settings)
-    return server
-
-
 def run_server(settings: DefaultVars = DefaultVars) -> None:
-    url = settings[settings.SERVER_URL]
+    host = settings[settings.SERVER_URL]
     port = settings[settings.SERVER_PORT]
-    with make_server(url, port, settings) as httpd:
+    with ExecutorWSGIServer(
+        server_address=(host, port), handler_cls=WSGIRequestHandler, settings=settings
+    ) as httpd:
+        # TODO add logging
         # ========== settings log
         print(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
-        print(f"Ready for Python code on {url}:{port} ...")
+        print(f"Ready for Python code on {host}:{port} ...")
         print("Settings: ")
         for k, v in httpd.settings.vars.items():
             print("{: <27}: {: <10}".format(k, str(v)))
