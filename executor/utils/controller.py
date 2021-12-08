@@ -286,7 +286,7 @@ class Controller(Generic[_T]):
         *,
         runner: Callable[_P, _T],
         context_layers: Sequence[Type[LayerContext]] = (),
-        default_settings: DefaultVars = DefaultVars,
+        default_settings: DefaultVars = DefaultVars(),
         options: Mapping = None,
         **kwargs,
     ) -> None:
@@ -303,19 +303,17 @@ class Controller(Generic[_T]):
         :param stderr:
         :param kwargs:
         """
-        options = {**(options or {}), **kwargs}
+        options = {**default_settings.vars, **(options or {}), **kwargs}
         self._default_settings = default_settings
-        self._target_version = options.get(
-            default_settings.TARGET_VERSION,
-            default_settings[default_settings.TARGET_VERSION],
-        )
+        self._target_version = options.get(default_settings.TARGET_VERSION)
 
         # register logger
         if options.get(
             DefaultVars.LOG_CMD_OUTPUT,
-            default_settings[default_settings.LOG_CMD_OUTPUT],
         ):
-            self._logger: Logger = options.get("logger", void_logger)
+            self._logger: Logger = options.get(
+                "logger", options.get(default_settings.LOGGER)
+            )
         else:
             self._logger = void_logger
 
@@ -337,9 +335,7 @@ class Controller(Generic[_T]):
         self._in_context: bool = False
 
         # local flag
-        self._is_local: bool = options.get(
-            default_settings.IS_LOCAL, default_settings[default_settings.IS_LOCAL]
-        )
+        self._is_local: bool = options.get(default_settings.IS_LOCAL)
 
         self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
 
@@ -348,29 +344,18 @@ class Controller(Generic[_T]):
 
         self._logger.debug(f"controller uses settings {default_settings}")
 
-        self._re_mem_size = options.get(
-            default_settings.EXEC_MEM_OUT,
-            default_settings[default_settings.EXEC_MEM_OUT],
-        ) * int(
+        self._re_mem_size = options.get(default_settings.EXEC_MEM_OUT,) * int(
             10e6
         )  # convert mb to bytes
         self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
 
-        self._re_cpu_time = options.get(
-            default_settings.EXEC_TIME_OUT,
-            default_settings[default_settings.EXEC_TIME_OUT],
-        )
+        self._re_cpu_time = options.get(default_settings.EXEC_TIME_OUT)
         self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
-        self._rand_seed = options.get(
-            default_settings.RAND_SEED, default_settings[default_settings.RAND_SEED]
-        )
+        self._rand_seed = options.get(default_settings.RAND_SEED)
         self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
 
-        self._float_precision = options.get(
-            default_settings.FLOAT_PRECISION,
-            default_settings[default_settings.FLOAT_PRECISION],
-        )
+        self._float_precision = options.get(default_settings.FLOAT_PRECISION)
         self._logger.debug(
             f"float precision will be {self._float_precision} in execution"
         )
@@ -787,7 +772,7 @@ class GraphController(Controller[List[MutableMapping]]):
         code: str,
         graph_data: dict | str,
         context_layers: Sequence[Type[LayerContext]] = (),
-        default_settings: DefaultVars = DefaultVars,
+        default_settings: DefaultVars = DefaultVars(),
         options: Mapping = None,
         **kwargs,
     ) -> None:
@@ -807,6 +792,14 @@ class GraphController(Controller[List[MutableMapping]]):
         # collect recorder and tracer
         self._recorder: _recorder_cls | None = None  # placeholder
         self._tracer: _tracer_cls | None = None  # placeholder
+        self._logger.debug(
+            "created controller with code \n"
+            "```python\n"
+            f"{self._code}\n"
+            "```\n"
+            "and graph data \n"
+            f"{self._graph_data}"
+        )
 
     def _build_graph(self) -> None:
         if isinstance(self._graph_data, str):
