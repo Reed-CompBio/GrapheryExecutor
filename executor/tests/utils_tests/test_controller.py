@@ -13,11 +13,12 @@ from ...utils.controller import GraphController, ErrorResult
 from ...utils.logger import void_logger
 
 _platform = platform()
+_versioned_settings = DefaultVars(**{DefaultVars.TARGET_VERSION: SERVER_VERSION})
 
 
-def make_test_controller_instance(ctrl_cls, **kwargs):
+def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
     ctrl = ctrl_cls(
-        **{DefaultVars.TARGET_VERSION: SERVER_VERSION},
+        default_settings=_versioned_settings,
         **kwargs,
     ).init()
     ctrl._is_local = True
@@ -227,6 +228,20 @@ class TestGraphController:
         assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
         result = ctrl.main()
         assert_no_error(result)
+
+    def test_wrong_version(self):
+        code = ""
+        graph_data = {}
+        not_versioned_settings = DefaultVars()
+        ctrl = self.controller(
+            code=code,
+            graph_data=graph_data,
+            default_settings=not_versioned_settings,
+        )
+        assert ctrl._target_version == not_versioned_settings.v.TARGET_VERSION
+
+        with pytest.raises(SystemExit):
+            ctrl.init()
 
     @pytest.mark.parametrize(
         "code, graph_data",
