@@ -136,6 +136,8 @@ class ExecutorWSGIServer(WSGIServer):
                 args.append(str(self.settings[k]))
             if k == self.settings.LOGGER:
                 args.append("shell_debug")
+            if k == self.settings.TARGET_VERSION:
+                args.append(SERVER_VERSION)
 
         args.append(SHELL_LOCAL_PARSER_NAME)
         return args

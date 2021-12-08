@@ -17,8 +17,8 @@ _platform = platform()
 
 def make_test_controller_instance(ctrl_cls, **kwargs):
     ctrl = ctrl_cls(
-        **kwargs,
         **{DefaultVars.TARGET_VERSION: SERVER_VERSION},
+        **kwargs,
     ).init()
     ctrl._is_local = True
     return ctrl

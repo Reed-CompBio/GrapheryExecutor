@@ -41,7 +41,7 @@ from ..settings import (
     INIT_ERROR_CODE,
     CPU_OUT_EXIT_CODE,
     MEM_OUT_EXIT_CODE,
-    # SERVER_VERSION,
+    SERVER_VERSION,
     POST_ERROR_CODE,
     PREP_ERROR_CODE,
 )
@@ -304,7 +304,6 @@ class Controller(Generic[_T]):
         """
         options = {**default_settings.vars, **(options or {}), **kwargs}
         self._default_settings = default_settings
-        self._target_version = options.get(default_settings.TARGET_VERSION)
 
         # register logger
         if options.get(
@@ -535,13 +534,6 @@ class Controller(Generic[_T]):
         self._user_globals.update(copy(self._custom_ns))
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
-    def _check_version(self) -> None:
-        pass
-        # if self._target_version != SERVER_VERSION:
-        #     raise ValueError(
-        #         f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
-        #     )
-
     # ===== init end end =====
 
     # ===== custom modules =====
@@ -571,7 +563,7 @@ class Controller(Generic[_T]):
         init layer maker, should be overwritten by subclasses if necessary
         :return: sequence of layer functions
         """
-        return (cls._check_version, cls._collect_builtins, cls._collect_globals)
+        return (cls._collect_builtins, cls._collect_globals)
 
     # ===== layer makers end =====
 
@@ -787,6 +779,7 @@ class GraphController(Controller[List[MutableMapping]]):
         # collect basic data
         self._code = code
         self._graph_data = graph_data
+        self._target_version = default_settings.v.TARGET_VERSION
         self._graph: nx.Graph | None = None  # placeholder
 
         # collect recorder and tracer
@@ -842,10 +835,17 @@ class GraphController(Controller[List[MutableMapping]]):
             (_DEFAULT_FILE_NAME, self._code.splitlines()),
         )
 
+    def _check_version(self) -> None:
+        if self._target_version != SERVER_VERSION:
+            raise ValueError(
+                f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
+            )
+
     @classmethod
     def _make_init_layers(cls) -> Sequence[LAYER_TYPE]:
         base = super()._make_init_layers()
         return (
+            cls._check_version,
             cls._build_graph,
             cls._build_recorder,
             cls._build_tracer,

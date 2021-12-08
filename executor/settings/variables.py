@@ -252,6 +252,11 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     @classmethod
     def var_arg_has_value(cls, var_field: str) -> bool:
+        if var_field == cls.LOGGER:
+            return False
+        if var_field == cls.TARGET_VERSION:
+            return False
+
         if var_field in cls.server_shell_var:
             store = cls.server_shell_var
         elif var_field in cls.general_shell_var:
@@ -263,8 +268,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
         if arg_options.get("action", None) == "store_true":
             return False
-        if var_field == cls.LOGGER:
-            return False
+
         return True
 
     @classmethod
