@@ -41,7 +41,7 @@ from ..settings import (
     INIT_ERROR_CODE,
     CPU_OUT_EXIT_CODE,
     MEM_OUT_EXIT_CODE,
-    SERVER_VERSION,
+    # SERVER_VERSION,
     POST_ERROR_CODE,
     PREP_ERROR_CODE,
 )
@@ -127,12 +127,12 @@ class LayerContext(contextlib.AbstractContextManager):
 class _FDRedirectLayer(LayerContext):
     def enter(self):
         self._ctrl.stdout_redirector.__enter__()
-        self._ctrl.stderr_redirector.__enter__()
+        # self._ctrl.stderr_redirector.__enter__()
         self._ctrl.logger.debug("redirected stdout and stderr")
 
     def exit(self) -> None:
         self._ctrl.stdout_redirector.__exit__(None, None, None)
-        self._ctrl.stderr_redirector.__exit__(None, None, None)
+        # self._ctrl.stderr_redirector.__exit__(None, None, None)
         self._ctrl.logger.debug("unredirected stdout and stderr")
 
 
@@ -536,10 +536,11 @@ class Controller(Generic[_T]):
         self._logger.debug(f"updated global with custom_ns {self._custom_ns}")
 
     def _check_version(self) -> None:
-        if self._target_version != SERVER_VERSION:
-            raise ValueError(
-                f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
-            )
+        pass
+        # if self._target_version != SERVER_VERSION:
+        #     raise ValueError(
+        #         f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
+        #     )
 
     # ===== init end end =====
 
