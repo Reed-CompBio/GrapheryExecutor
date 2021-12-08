@@ -211,7 +211,9 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             ("-g", "--logger"),
             {
                 "default": vars[LOGGER],
-                "choices": [*AVAILABLE_LOGGERS.keys()],
+                "choices": [*AVAILABLE_LOGGERS.values()],
+                "type": AVAILABLE_LOGGERS.get,
+                "metavar": f"{{{', '.join(AVAILABLE_LOGGERS.keys())}}}",
             },
         ),
     }
@@ -260,6 +262,8 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         arg_options: Mapping = store[var_field][1]
 
         if arg_options.get("action", None) == "store_true":
+            return False
+        if var_field == cls.LOGGER:
             return False
         return True
 
