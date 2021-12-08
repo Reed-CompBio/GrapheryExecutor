@@ -191,22 +191,21 @@ class _ModuleRestrict(LayerContext):
 
 class ControllerResultFormatter:
     def __init__(self, output=_sys.stdout):
-        self._stdout = output
+        self._out = output
 
     def write(self, s: str) -> None:
-        self._stdout.write(s)
+        self._out.write(s)
 
     def show_error(
         self, exception: Exception, trace: str = None, error_code: int = 1
     ) -> NoReturn:
-        from traceback import print_exc
+        from traceback import format_exc
 
-        self.write(f"An error occurs with exit code {error_code}. Error: {exception}")
-        self.write("traceback: ")
+        self.write(f"An error occurs with exit code {error_code}. Error: {exception}\n")
         if trace:
-            print(trace)
+            self.write(trace)
         else:
-            print_exc()
+            self.write(format_exc())
         exit(error_code)
 
     def show_result(self, result: str) -> None:
@@ -818,7 +817,7 @@ class GraphController(Controller[List[MutableMapping]]):
         self._graph = (
             self._graph_data
             if isinstance(self._graph_data, nx.Graph)
-            else self._graph_builder(self._graph_data)
+            else type(self)._graph_builder(self._graph_data)
         )
         self._logger.debug(f"made graph {self._graph}")
 
