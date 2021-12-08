@@ -38,7 +38,9 @@ class ExecutorWSGIServer(WSGIServer):
             server_address, handler_cls, bind_and_activate=bind_and_activate
         )
         self.settings = settings
+        self.logger = settings.v.LOGGER
         self.set_app(self.application)
+        self.logger.debug("initialized logger WSGI Server")
 
     def application(self, environ: Mapping, start_response: Callable) -> List:
         response_code = "200 OK"
@@ -59,7 +61,7 @@ class ExecutorWSGIServer(WSGIServer):
             ),
         ]
 
-        formatter = ServerResultFormatter()
+        formatter = ServerResultFormatter(self.logger)
 
         # origin check
         origin = environ.get("HTTP_ORIGIN", "")
@@ -81,7 +83,7 @@ class ExecutorWSGIServer(WSGIServer):
             except ArgumentError as e:
                 formatter.add_error(
                     message=f"Wrong argument is passed. Error: {e}",
-                    traceback=None,
+                    traceback=traceback.format_exc(),
                 )
             except ServerError as e:
                 formatter.add_error(
@@ -114,12 +116,12 @@ class ExecutorWSGIServer(WSGIServer):
             raise ArgumentError("Bad Request: Wrong Methods.")
 
         # get request content
-        request_body = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
+        request_body: bytes = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
 
         return self.execute(request_body)
 
     @property
-    def _subprocess_command(self) -> str:
+    def _subprocess_command(self) -> List[str]:
         # TODO fix this; don't use str literal
 
         proc_name = which("graphery_executor")
@@ -132,30 +134,38 @@ class ExecutorWSGIServer(WSGIServer):
             args.append(arg_name)
             if self.settings.var_arg_has_value(k):
                 args.append(str(self.settings[k]))
+            if k == self.settings.LOGGER:
+                args.append("shell_debug")
 
         args.append(SHELL_LOCAL_PARSER_NAME)
-        return " ".join(args)
+        return args
 
-    def execute(self, config_str: str) -> List[Mapping]:
-        proc = subprocess.Popen(
-            self._subprocess_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE
-        )
+    def execute(self, config_str: bytes) -> List[Mapping]:
+        command = self._subprocess_command
+        self.logger.debug(f"opening subprocess with command {command}")
+        proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         try:
             stdout, stderr = proc.communicate(
-                config_str.encode(),
+                config_str,
                 timeout=self.settings[self.settings.EXEC_TIME_OUT],
             )
-        except subprocess.TimeoutExpired:
+            self.logger.info(f"finished running {command} successfully")
+        except Exception as e:
+            self.logger.warn(f"running failed: {command}")
             proc.kill()
-            raise ExecutionError("Execution Timed out.")
-        else:
-            stdout, stderr = stdout.decode(), stderr.decode()
-            try:
-                res = json.loads(stdout)
-            except json.JSONDecodeError:
-                raise ExecutionError(
-                    stdout[: stdout.index("\n")], f"{stdout}\n{stderr}"
-                )
+            stdout, stderr = proc.communicate()
+            self.logger.warn("running error: " f"{stdout}")
+            self.logger.warn("running logs: " f"{stderr}")
+            raise ExecutionError(f"Error happened in subprocess. Error: {e}")
+
+        if stderr is None:
+            stderr = b""
+        stdout, stderr = stdout.decode(), stderr.decode()
+
+        try:
+            res = json.loads(stdout)
+        except json.JSONDecodeError:
+            raise ExecutionError(stdout[: stdout.index("\n")], f"{stdout}\n{stderr}")
 
         return res
 
