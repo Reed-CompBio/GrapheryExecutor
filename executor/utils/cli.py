@@ -49,11 +49,15 @@ def _local_run(settings: DefaultVars) -> None:
     # is empty. If a filename is '-', it is also replaced by sys.stdin and the optional arguments mode and
     # openhook are ignored.
     logger = settings.v.LOGGER
+    logger.debug(f"using logger {logger}")
 
     import fileinput
     import json
 
-    request_obj: Mapping = json.loads(fileinput.input("-").readline())
+    input_content = fileinput.input("-").readline()
+    logger.debug("got input content from stdin: " f"{input_content}")
+
+    request_obj: Mapping = json.loads(input_content)
     code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
     graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
     options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
