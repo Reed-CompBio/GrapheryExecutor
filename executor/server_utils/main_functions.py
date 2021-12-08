@@ -145,7 +145,12 @@ class ExecutorWSGIServer(WSGIServer):
     def execute(self, config_str: bytes) -> List[Mapping]:
         command = self._subprocess_command
         self.logger.debug(f"opening subprocess with command {command}")
-        proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         try:
             stdout, stderr = proc.communicate(
                 config_str,
@@ -156,12 +161,10 @@ class ExecutorWSGIServer(WSGIServer):
             self.logger.warn(f"running failed: {command}")
             proc.kill()
             stdout, stderr = proc.communicate()
-            self.logger.warn("running error: " f"{stdout}")
-            self.logger.warn("running logs: " f"{stderr}")
-            raise ExecutionError(f"Error happened in subprocess. Error: {e}")
+            raise ExecutionError(
+                f"Error happened in subprocess. Error: {e}", f"{stdout}\n{stderr}"
+            )
 
-        if stderr is None:
-            stderr = b""
         stdout, stderr = stdout.decode(), stderr.decode()
 
         try:
