@@ -183,7 +183,6 @@ def run_server(settings: DefaultVars) -> None:
     with ExecutorWSGIServer(
         server_address=(host, port), handler_cls=WSGIRequestHandler, settings=settings
     ) as httpd:
-        # TODO add logging
         # ========== settings log
         logger.info(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
         logger.info(f"Ready for Python code on {host}:{port} ...")

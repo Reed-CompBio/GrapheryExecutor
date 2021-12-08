@@ -673,7 +673,6 @@ class Controller(Generic[_T]):
         try:
             result = self._runner(*args, **kwargs)
         except Exception as e:
-            # TODO hmmmm can we use formatter?
             # but this is going to mess up the tests
             from traceback import format_exc
 
@@ -864,7 +863,6 @@ class GraphController(Controller[List[MutableMapping]]):
 
         super(GraphController, self)._collect_globals()
 
-    # TODO add option setter such as rand seed
     def _graph_runner(self) -> List[MutableMapping]:
         """
         Graphery graph runner
