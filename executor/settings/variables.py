@@ -21,6 +21,8 @@ __all__ = [
     "SHELL_LOCAL_PARSER_NAME",
 ]
 
+from executor.utils.logger import AVAILABLE_LOGGERS, shell_info_logger
+
 _ENV_PREFIX: Final[str] = "GE_"
 
 
@@ -78,6 +80,7 @@ class _DefaultVarsFields(Protocol):
     RAND_SEED: ClassVar[str]
     FLOAT_PRECISION: ClassVar[str]
     TARGET_VERSION: ClassVar[str]
+    LOGGER: ClassVar[str]
 
     REQUEST_DATA_CODE_NAME: ClassVar[str]
     REQUEST_DATA_GRAPH_NAME: ClassVar[str]
@@ -90,6 +93,7 @@ class _VarGetter(_DefaultVarsFields):
 
     def __getattr__(self, item):
         if item not in self._storage.vars:
+            print(self._storage.vars)
             raise AttributeError(
                 f"'{self.__class__.__name__}' object has no attribute '{item}'"
             )
@@ -98,7 +102,7 @@ class _VarGetter(_DefaultVarsFields):
 
 class DefaultVars(_DefaultVarsFields, VarClass):
     SERVER_URL = "SERVER_URL"
-    SERVER_PORT = "SERVE_PORT"
+    SERVER_PORT = "SERVER_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
     ACCEPTED_ORIGINS = "ACCEPTED_ORIGINS"
 
@@ -109,6 +113,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
     TARGET_VERSION = "TARGET_VERSION"
+    LOGGER = "LOGGER"
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
@@ -119,6 +124,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
         ACCEPTED_ORIGINS: ["127.0.0.1"],
+        LOGGER: shell_info_logger,
         #
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
@@ -200,6 +206,13 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         TARGET_VERSION: (
             ("-v", "--target-version"),
             {"default": vars[TARGET_VERSION], "type": str},
+        ),
+        LOGGER: (
+            ("-g", "--logger"),
+            {
+                "default": vars[LOGGER],
+                "choices": [*AVAILABLE_LOGGERS.keys()],
+            },
         ),
     }
 
