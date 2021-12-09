@@ -9,6 +9,7 @@ from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final
 __all__ = [
     "VarClass",
     "DefaultVars",
+    "PROG_NAME",
     "SERVER_VERSION",
     "IDENTIFIER_SEPARATOR",
     "CTRL_ERROR_CODE",
@@ -29,6 +30,7 @@ _ENV_PREFIX: Final[str] = "GE_"
 
 
 # Custom Variables
+PROG_NAME: Final[str] = "graphery_executor"
 SERVER_VERSION: Final[str] = "3.0.0a0"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 
