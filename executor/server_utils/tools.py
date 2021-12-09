@@ -64,9 +64,20 @@ class ServerResultFormatter:
         return info_msg
 
     def _error_msg_valid(self, error_msg: Dict) -> bool:
-        # TODO err msg validator
-        return True
+        try:
+            assert isinstance(error_msg, Dict)
+            assert "message" in error_msg
+            assert "traceback" in error_msg
+        except AssertionError:
+            return False
+        else:
+            return True
 
     def _info_msg_valid(self, info_msg: Dict) -> bool:
-        # TODO info msg validator
-        return True
+        try:
+            assert isinstance(info_msg, Dict)
+            assert "data" in info_msg
+        except AssertionError:
+            return False
+        else:
+            return True

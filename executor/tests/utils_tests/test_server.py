@@ -4,7 +4,7 @@ import json
 import sys
 from io import BytesIO
 from types import TracebackType
-from typing import Dict, Mapping, NoReturn, Type, Callable, Any
+from typing import Dict, Mapping, NoReturn, Type, Callable, Any, List
 from wsgiref.headers import Headers
 from wsgiref.simple_server import WSGIRequestHandler
 
@@ -70,11 +70,13 @@ class TestServer:
         inputs = BytesIO()
         env["wsgi.input"] = inputs
         if isinstance(content, str):
-            inputs.write(content.encode())
+            content = content.encode()
         elif isinstance(content, bytes):
-            inputs.write(content)
+            pass
         else:
             raise ValueError("Cannot write content other than str or bytes")
+        env["CONTENT_LENGTH"] = len(content)
+        inputs.write(content)
 
     @pytest.fixture(scope="function")
     def start_response(self) -> _ResponseFn:
@@ -128,14 +130,91 @@ class TestServer:
         res: bytes = server.application(self.mock_env, start_response)[0]
         res_obj = json.loads(res.decode())
         assert (errors := res_obj["errors"]) is not None, "errors shouldn't be None"
-        for error_obj in errors:
-            assert (
-                error_msg := error_obj["message"]
-            ) is not None, "error message shouldn't be None"
-            assert (
-                error_msg == expected_msg
-            ), f"unexpected error message: {error_msg}, expecting {expected_msg}"
+        error_obj = errors[0]
+        assert (
+            error_msg := error_obj["message"]
+        ) is not None, "error message shouldn't be None"
+        assert (
+            error_msg == expected_msg
+        ), f"unexpected error message: {error_msg}, expecting {expected_msg}"
         assert start_response.response.status == server.default_response_code
+
+    @pytest.mark.parametrize("info, target_info", [("test info", "test info")])
+    def test_application_info(self, start_response, info, target_info):
+        class _Server(ExecutorWSGIServer):
+            def application_helper(self, environ: Mapping) -> str:
+                return info
+
+        server = _Server(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=self.default_settings,
+            bind_and_activate=self.bind,
+        )
+
+        res: bytes = server.application(self.mock_env, start_response)[0]
+        res_obj = json.loads(res.decode())
+
+        assert (errors := res_obj["errors"]) is None, f"errors happened: {errors}"
+        assert (info := res_obj["info"]) is not None, "info shouldn't be None"
+        info_obj = info[0]
+        assert (
+            info_msg := info_obj["data"]
+        ) is not None, "error message shouldn't be None"
+        assert (
+            info_msg == target_info
+        ), f"unexpected error message: {info_msg}, expecting {target_info}"
+        assert start_response.response.status == server.default_response_code
+
+    @pytest.mark.parametrize(
+        "options, slug, err",
+        [
+            ({}, "/env", ArgumentError),
+            ({DefaultVars.IS_LOCAL: True}, "/env", None),
+            ({}, "/everything-else", ArgumentError),
+        ],
+    )
+    def test_get(self, options: Mapping, slug: str, err: Type[Exception]):
+        mock_env = {**self.mock_env, "PATH_INFO": slug}
+
+        server = ExecutorWSGIServer(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=DefaultVars(**options),
+            bind_and_activate=self.bind,
+        )
+        if err:
+            with pytest.raises(err):
+                server.do_get(mock_env)
+        else:
+            server.do_get(mock_env)
+
+    @pytest.mark.parametrize(
+        "slug, err",
+        [
+            ("/run", None),
+            ("/everything-else", ArgumentError),
+        ],
+    )
+    def test_post(self, slug: str, err: Type[Exception]):
+        class _Server(ExecutorWSGIServer):
+            def execute(self, config_str: bytes) -> List[Mapping]:
+                return [{}]
+
+        mock_env = {**self.mock_env, "PATH_INFO": slug}
+        self.add_content(mock_env, "")
+
+        server = _Server(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=DefaultVars(),
+            bind_and_activate=self.bind,
+        )
+        if err:
+            with pytest.raises(err):
+                server.do_post(mock_env)
+        else:
+            server.do_post(mock_env)
 
 
 class TestResultFormatter:

@@ -105,17 +105,21 @@ class ExecutorWSGIServer(WSGIServer):
                 raise ArgumentError("Bad Request: Wrong Methods.")
 
     def do_get(self, environ: Mapping):
-        match environ:
+        slug = environ.get("PATH_INFO")
+        match slug:
             case "/env":
                 if self.settings.v.IS_LOCAL:
                     return environ
                 else:
                     raise ArgumentError("Bad Request: Cannot access ENV")
             case _:
-                raise ArgumentError("Bad Request: Wrong Methods.")
+                raise ArgumentError(
+                    f"Bad Request: Cannot access {slug} with method GET"
+                )
 
     def do_post(self, environ: Mapping):
-        match environ:
+        slug = environ.get("PATH_INFO")
+        match slug:
             case "/run":
                 request_body: bytes = environ["wsgi.input"].read(
                     int(environ["CONTENT_LENGTH"])
