@@ -34,7 +34,7 @@ class ExecutorWSGIServer(WSGIServer):
         self.set_app(self.application)
         self.logger.debug("initialized logger WSGI Server")
 
-    def application(self, environ: Mapping, start_response: Callable) -> List:
+    def application(self, environ: Mapping, start_response: Callable) -> List[bytes]:
         response_code = "200 OK"
         headers = [
             ("Content-Type", "application/json"),
@@ -94,21 +94,32 @@ class ExecutorWSGIServer(WSGIServer):
 
     def application_helper(self, environ: Mapping) -> Mapping | List[Mapping]:
         method: str = environ.get("REQUEST_METHOD")
-        path: str = environ.get("PATH_INFO")
 
-        # TODO restrict info page
-        # info page
-        if method == "GET" and path == "/env":
-            return environ
+        match method:
+            case 'GET':
+                return self.do_get(environ)
+            case 'POST':
+                return self.do_post(environ)
+            case _:
+                raise ArgumentError("Bad Request: Wrong Methods.")
 
-        # entry point check
-        if method != "POST" or path != "/run":
-            raise ArgumentError("Bad Request: Wrong Methods.")
+    def do_get(self, environ: Mapping):
+        match environ:
+            case '/env':
+                if self.settings.v.IS_LOCAL:
+                    return environ
+                else:
+                    raise ArgumentError('Bad Request: Cannot access ENV')
+            case _:
+                raise ArgumentError("Bad Request: Wrong Methods.")
 
-        # get request content
-        request_body: bytes = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
-
-        return self.execute(request_body)
+    def do_post(self, environ: Mapping):
+        match environ:
+            case '/run':
+                request_body: bytes = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
+                return self.execute(request_body)
+            case _:
+                raise ArgumentError("Bad Request: Wrong Methods.")
 
     @property
     def _subprocess_command(self) -> List[str]:
