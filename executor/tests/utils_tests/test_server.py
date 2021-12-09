@@ -167,14 +167,58 @@ class TestServer:
         assert start_response.response.status == server.default_response_code
 
     @pytest.mark.parametrize(
-        "options, slug, err",
+        "method, target_result, err",
         [
-            ({}, "/env", ArgumentError),
-            ({DefaultVars.IS_LOCAL: True}, "/env", None),
-            ({}, "/everything-else", ArgumentError),
+            ("GET", "get", None),
+            ("POST", "post", None),
+            ("PATCH", "patch", ArgumentError),
         ],
     )
-    def test_get(self, options: Mapping, slug: str, err: Type[Exception]):
+    def test_application_helper(
+        self, method: str, target_result: str, err: Type[Exception] | None
+    ):
+        class _Server(ExecutorWSGIServer):
+            def do_get(self, environ: Mapping):
+                return "get"
+
+            def do_post(self, environ: Mapping):
+                return "post"
+
+        server = _Server(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=self.default_settings,
+            bind_and_activate=self.bind,
+        )
+        mock_env = {**self.mock_env, "REQUEST_METHOD": method}
+
+        if err:
+            with pytest.raises(err):
+                server.application_helper(mock_env)
+        else:
+            res = server.application_helper(mock_env)
+            assert res == target_result
+
+    @pytest.mark.parametrize(
+        "options, slug, target_checker, err",
+        [
+            ({}, "/env", None, ArgumentError),
+            (
+                {DefaultVars.IS_LOCAL: True},
+                "/env",
+                lambda x: isinstance(x, Mapping),
+                None,
+            ),
+            ({}, "/everything-else", None, ArgumentError),
+        ],
+    )
+    def test_get(
+        self,
+        options: Mapping,
+        slug: str,
+        target_checker: Callable | None,
+        err: Type[Exception] | None,
+    ):
         mock_env = {**self.mock_env, "PATH_INFO": slug}
 
         server = ExecutorWSGIServer(
@@ -187,16 +231,18 @@ class TestServer:
             with pytest.raises(err):
                 server.do_get(mock_env)
         else:
-            server.do_get(mock_env)
+            assert target_checker(server.do_get(mock_env))
 
     @pytest.mark.parametrize(
-        "slug, err",
+        "slug, target_checker, err",
         [
-            ("/run", None),
-            ("/everything-else", ArgumentError),
+            ("/run", lambda x: x == [{}], None),
+            ("/everything-else", None, ArgumentError),
         ],
     )
-    def test_post(self, slug: str, err: Type[Exception]):
+    def test_post(
+        self, slug: str, target_checker: Callable | None, err: Type[Exception] | None
+    ):
         class _Server(ExecutorWSGIServer):
             def execute(self, config_str: bytes) -> List[Mapping]:
                 return [{}]
@@ -214,7 +260,43 @@ class TestServer:
             with pytest.raises(err):
                 server.do_post(mock_env)
         else:
-            server.do_post(mock_env)
+            assert target_checker(server.do_post(mock_env))
+
+    @pytest.mark.parametrize(
+        "settings, target_command",
+        [
+            (
+                DefaultVars(),
+                [
+                    "-l",
+                    "-t",
+                    "5",
+                    "-m",
+                    "100",
+                    "-i",
+                    "-r",
+                    "0",
+                    "-f",
+                    "4",
+                    "-v",
+                    "3.0.0a0",
+                    "-g",
+                    "shell_debug",
+                    "local",
+                ],
+            ),
+        ],
+    )
+    def test_subprocess_command(self, settings: DefaultVars, target_command: List[str]):
+        server = ExecutorWSGIServer(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=settings,
+            bind_and_activate=self.bind,
+        )
+        command = server._subprocess_command[1:]
+        # we don't want to test the executable path
+        assert command == target_command
 
 
 class TestResultFormatter:
