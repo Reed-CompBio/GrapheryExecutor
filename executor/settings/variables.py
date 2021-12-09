@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from logging import Logger
 from os import getenv as _getenv
+from types import NoneType
 from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final
 
 __all__ = [
@@ -225,19 +227,52 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     def __getitem__(self, item: str):
         return self.vars[item]
 
-    def read_from_env(self, *args, all_arg: bool = False) -> None:
-        if all_arg:
+    @classmethod
+    def make_shell_env_name(cls, name: str) -> str:
+        return f"{_ENV_PREFIX}{name}"
+
+    def read_from_env(self, *args, all_args: bool = False) -> None:
+        if all_args:
             args = self.vars.keys()
 
         for env_name in args:
-            shell_env_name = f"{_ENV_PREFIX}{env_name}"
+            shell_env_name = self.make_shell_env_name(env_name)
             original = self.vars[env_name]
             # type conversions from str to the proper type
             og_type = type(original)
             if og_type is list:
                 og_type = json.loads
+            elif og_type is bool:
 
-            self.vars[env_name] = og_type(_getenv(shell_env_name, original))
+                def parse_bool(x: str):
+                    x = x.lower()
+                    if x == "true" or x == "t":
+                        return True
+                    elif x == "false" or x == "f":
+                        return False
+                    else:
+                        return bool(x)
+
+                og_type = parse_bool
+            elif og_type is int:
+
+                def parse_int(x: str):
+                    x = x.lower()
+                    if x == "none":
+                        return None
+                    else:
+                        return int(x)
+
+                og_type = parse_int
+
+            elif og_type is Logger:
+                og_type = AVAILABLE_LOGGERS.get
+            elif og_type == NoneType:
+                og_type = str
+
+            from_env = _getenv(shell_env_name, None)
+            if from_env is not None:
+                self.vars[env_name] = og_type(from_env)
 
     @classmethod
     def get_var_arg_name(cls, var_field: str) -> str:
