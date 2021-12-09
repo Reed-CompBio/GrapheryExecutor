@@ -102,7 +102,7 @@ class ExecutorWSGIServer(WSGIServer):
             case "POST":
                 return self.do_post(environ)
             case _:
-                raise ArgumentError("Bad Request: Wrong Methods.")
+                raise ArgumentError(f"Bad Request: Unsupported Method {method}.")
 
     def do_get(self, environ: Mapping):
         slug = environ.get("PATH_INFO")

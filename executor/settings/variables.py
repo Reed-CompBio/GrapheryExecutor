@@ -159,7 +159,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             },
         ),
         ALLOW_OTHER_ORIGIN: (
-            ("--allow-origin",),
+            ("-a", "--allow-origin"),
             {"default": vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
         ),
         ACCEPTED_ORIGINS: (
@@ -187,18 +187,18 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             },
         ),
         IS_LOCAL: (
-            ("--local",),
+            ("-i", "--is-local"),
             {"default": vars[IS_LOCAL], "action": "store_true"},
         ),
         RAND_SEED: (
-            ("-s", "--rand-seed"),
+            ("-r", "--rand-seed"),
             {
                 "default": str(vars[RAND_SEED]),
                 "type": lambda x: None if x.strip() == "None" else int(x),
             },
         ),
         FLOAT_PRECISION: (
-            ("--float-precision",),
+            ("-f", "--float-precision"),
             {
                 "default": vars[FLOAT_PRECISION],
                 "type": int,
