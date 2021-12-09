@@ -4,13 +4,14 @@ import argparse
 from typing import Mapping, Union, Sequence, Type
 
 from executor.server_utils.main_functions import run_server
-from executor.settings import DefaultVars
-from executor.settings.variables import (
+from executor.settings import (
+    DefaultVars,
     SHELL_PARSER_GROUP_NAME,
     SHELL_SERVER_PARSER_NAME,
     SHELL_LOCAL_PARSER_NAME,
     RUNNER_ERROR_CODE,
     CTRL_ERROR_CODE,
+    SERVER_VERSION,
 )
 from executor.utils.controller import (
     GraphController,
@@ -24,6 +25,10 @@ def arg_parser(
     parser = argparse.ArgumentParser(
         prog="graphery_executor", description="Graphery Executor Server"
     )
+    parser.add_argument(
+        "-V", "--version", action="version", version=f"%(prog)s {SERVER_VERSION}"
+    )
+
     exec_parser_group = parser.add_subparsers(
         required=True, dest=SHELL_PARSER_GROUP_NAME
     )
