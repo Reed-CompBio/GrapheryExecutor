@@ -4,7 +4,7 @@ import json
 import subprocess
 import traceback
 from socketserver import BaseRequestHandler
-from typing import Mapping, Callable, Any, List
+from typing import Mapping, Callable, List
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
 from shutil import which
 
@@ -16,14 +16,6 @@ from .tools import (
 )
 from .. import SERVER_VERSION
 from ..settings import DefaultVars, SHELL_LOCAL_PARSER_NAME
-
-
-class StringEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        try:
-            json.JSONEncoder.default(self, obj)
-        except TypeError:
-            return str(obj)
 
 
 class ExecutorWSGIServer(WSGIServer):
@@ -50,12 +42,12 @@ class ExecutorWSGIServer(WSGIServer):
                 "Access-Control-Allow-Headers",
                 ", ".join(
                     (
-                        "accept",
-                        "accept-encoding",
-                        "content-type",
-                        "origin",
-                        "user-agent",
-                        "x-requested-with",
+                        "Accept",
+                        "Accept-Encoding",
+                        "Content-Type",
+                        "Origin",
+                        "User-Agent",
+                        "X-Requested-With",
                     )
                 ),
             ),
@@ -98,9 +90,7 @@ class ExecutorWSGIServer(WSGIServer):
 
         headers.append(("Access-Control-Allow-Origin", origin))
         start_response(response_code, headers)
-        return [
-            json.dumps(formatter.format_server_result(), cls=StringEncoder).encode()
-        ]
+        return [formatter.format_server_result().encode()]
 
     def application_helper(self, environ: Mapping) -> Mapping | List[Mapping]:
         method: str = environ.get("REQUEST_METHOD")

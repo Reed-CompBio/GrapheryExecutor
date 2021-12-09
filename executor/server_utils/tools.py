@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Any
 import json
+
+
+class StringEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        try:
+            json.JSONEncoder.default(self, obj)
+        except TypeError:
+            return str(obj)
 
 
 class ExecutionError(ValueError):
@@ -25,7 +33,9 @@ class ServerResultFormatter:
         self._logger = logger
 
     def format_server_result(self) -> str:
-        return json.dumps({"errors": self._errors, "info": self._info})
+        return json.dumps(
+            {"errors": self._errors, "info": self._info}, cls=StringEncoder
+        )
 
     def add_error(self, **kwargs) -> Dict:
         error_msg = {**kwargs}
