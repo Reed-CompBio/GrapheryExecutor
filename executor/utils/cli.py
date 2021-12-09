@@ -12,6 +12,7 @@ from executor.settings import (
     RUNNER_ERROR_CODE,
     CTRL_ERROR_CODE,
     SERVER_VERSION,
+    PROG_NAME,
 )
 from executor.utils.controller import (
     GraphController,
@@ -23,7 +24,7 @@ def arg_parser(
     settings_cls: Type[DefaultVars] = DefaultVars, args: Sequence[str] = None
 ) -> Mapping[str, Union[int, str]]:
     parser = argparse.ArgumentParser(
-        prog="graphery_executor", description="Graphery Executor Server"
+        prog=PROG_NAME, description="Graphery Executor Server"
     )
     parser.add_argument(
         "-V", "--version", action="version", version=f"%(prog)s {SERVER_VERSION}"

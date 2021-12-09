@@ -15,7 +15,7 @@ from .tools import (
     ExecutionError,
 )
 from .. import SERVER_VERSION
-from ..settings import DefaultVars, SHELL_LOCAL_PARSER_NAME
+from ..settings import DefaultVars, SHELL_LOCAL_PARSER_NAME, PROG_NAME
 
 
 class ExecutorWSGIServer(WSGIServer):
@@ -130,9 +130,7 @@ class ExecutorWSGIServer(WSGIServer):
 
     @property
     def _subprocess_command(self) -> List[str]:
-        # TODO fix this; don't use str literal
-
-        proc_name = which("graphery_executor")
+        proc_name = which(PROG_NAME)
         if proc_name is None:
             raise ServerError("Cannot find executor program in system path")
 
