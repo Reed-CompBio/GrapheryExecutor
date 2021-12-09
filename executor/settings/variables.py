@@ -166,7 +166,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         ),
         ACCEPTED_ORIGINS: (
             ("-o", "--origin"),
-            {"default": vars[ACCEPTED_ORIGINS], "action": "append"},
+            {"default": vars[ACCEPTED_ORIGINS], "action": "extend", "nargs": "+"},
         ),
     }
     general_shell_var = {
