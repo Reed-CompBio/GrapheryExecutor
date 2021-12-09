@@ -6,10 +6,7 @@ import logging
 from types import FrameType
 from typing import Tuple, List, Any
 
-try:
-    from collections.abc import Mapping, Sequence
-except ImportError:
-    from collections import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 
 from . import utils

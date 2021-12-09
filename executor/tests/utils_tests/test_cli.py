@@ -6,6 +6,8 @@ from ...utils.cli import arg_parser
 from ...settings import DefaultVars, SHELL_SERVER_PARSER_NAME, SHELL_LOCAL_PARSER_NAME
 import pytest
 
+from ...utils.logger import shell_debug_logger
+
 
 class TestArgparse:
     def setup_class(self):
@@ -70,22 +72,17 @@ class TestArgparse:
                 (DefaultVars.RAND_SEED, "10", 10),
                 (DefaultVars.FLOAT_PRECISION, "5", 5),
                 (DefaultVars.TARGET_VERSION, "3.0.0", "3.0.0"),
+                (DefaultVars.LOGGER, "shell_debug", shell_debug_logger),
             )
         ],
     )
     def test_optional_args(self, local_settings: str, var: Any, expected: Any):
         for tp in [SHELL_SERVER_PARSER_NAME, SHELL_LOCAL_PARSER_NAME]:
             arg_name = self.settings.get_var_arg_name(local_settings)
-            args = []
+            args = [arg_name]
 
-            if isinstance(var, List):
-                for v in var:
-                    args.append(arg_name)
-                    args.append(str(v))
-            else:
-                args.append(arg_name)
-                if var is not None:
-                    args.append(str(var))
+            if var is not None:
+                args.append(str(var))
 
             args.append(tp)
             parsed_args = arg_parser(args=args)
