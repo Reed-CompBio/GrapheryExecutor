@@ -32,11 +32,9 @@ class ExecutorWSGIServer(WSGIServer):
         self.settings = settings
         self.logger = settings.v.LOGGER
         self.set_app(self.application)
-        self.logger.debug("initialized logger WSGI Server")
 
-    def application(self, environ: Mapping, start_response: Callable) -> List[bytes]:
-        response_code = "200 OK"
-        headers = [
+        self.default_response_code = "200 OK"
+        self.base_response_header = [
             ("Content-Type", "application/json"),
             (
                 "Access-Control-Allow-Headers",
@@ -53,6 +51,9 @@ class ExecutorWSGIServer(WSGIServer):
             ),
         ]
 
+        self.logger.debug("initialized logger WSGI Server")
+
+    def application(self, environ: Mapping, start_response: Callable) -> List[bytes]:
         formatter = ServerResultFormatter(self.logger)
 
         # origin check
@@ -88,35 +89,37 @@ class ExecutorWSGIServer(WSGIServer):
                     traceback=traceback.format_exc(),
                 )
 
-        headers.append(("Access-Control-Allow-Origin", origin))
-        start_response(response_code, headers)
+        headers = [*self.base_response_header, ("Access-Control-Allow-Origin", origin)]
+        start_response(self.default_response_code, headers)
         return [formatter.format_server_result().encode()]
 
     def application_helper(self, environ: Mapping) -> Mapping | List[Mapping]:
         method: str = environ.get("REQUEST_METHOD")
 
         match method:
-            case 'GET':
+            case "GET":
                 return self.do_get(environ)
-            case 'POST':
+            case "POST":
                 return self.do_post(environ)
             case _:
                 raise ArgumentError("Bad Request: Wrong Methods.")
 
     def do_get(self, environ: Mapping):
         match environ:
-            case '/env':
+            case "/env":
                 if self.settings.v.IS_LOCAL:
                     return environ
                 else:
-                    raise ArgumentError('Bad Request: Cannot access ENV')
+                    raise ArgumentError("Bad Request: Cannot access ENV")
             case _:
                 raise ArgumentError("Bad Request: Wrong Methods.")
 
     def do_post(self, environ: Mapping):
         match environ:
-            case '/run':
-                request_body: bytes = environ["wsgi.input"].read(int(environ["CONTENT_LENGTH"]))
+            case "/run":
+                request_body: bytes = environ["wsgi.input"].read(
+                    int(environ["CONTENT_LENGTH"])
+                )
                 return self.execute(request_body)
             case _:
                 raise ArgumentError("Bad Request: Wrong Methods.")
