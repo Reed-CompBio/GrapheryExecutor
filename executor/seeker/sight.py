@@ -233,7 +233,7 @@ class Tracer:
     @classmethod
     def set_new_recorder(cls, recorder: Recorder) -> None:
         cls._recorder = recorder
-        cls._logger.debug(f"tracer cls sets recorder {recorder}")
+        cls.log_debug(f"tracer cls sets recorder {recorder}")
 
     @classmethod
     def get_recorder_change_list(cls) -> List[Mapping]:
@@ -242,18 +242,24 @@ class Tracer:
     @classmethod
     def set_logger(cls, logger: Optional[logging.Logger]) -> None:
         cls._logger = logger
-        cls._logger.debug(f"tracer cls sets logger {logger}")
+        cls.log_debug(f"tracer cls sets logger {logger}")
 
     @classmethod
-    def log_output(cls, message: str) -> None:
-        cls._logger.info(message.rstrip())
+    def log_info(cls, message: str) -> None:
+        if cls._logger:
+            cls._logger.info(message.strip())
+
+    @classmethod
+    def log_debug(cls, message: str) -> None:
+        if cls._logger:
+            cls._logger.debug(message.strip())
 
     @classmethod
     def set_additional_source(
         cls, key: Tuple[str, str], value: Tuple[str, List[str]]
     ) -> None:
         cls._additional_source[key] = value
-        cls._logger.debug(f"added additional code source for {key}: \n" f"{value}")
+        cls.log_debug(f"added additional code source for {key}: \n" f"{value}")
 
     def __call__(self, function_or_class):
         if DISABLED:
