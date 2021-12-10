@@ -354,6 +354,13 @@ class TestServer:
                     "match": r"Cannot unload execution subprocess result. Error might have occurred in the execution: .*",
                 },
             ),
+            (
+                "\n".encode(),
+                {
+                    "expected_exception": ExecutionError,
+                    "match": r"Empty execution result. Error might have occurred in the execution.",
+                },
+            ),
         ],
     )
     def test_execute(self, config_bytes: bytes, error: Mapping | None):
