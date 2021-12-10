@@ -167,15 +167,22 @@ class TestServer:
         assert start_response.response.status == server.default_response_code
 
     @pytest.mark.parametrize(
-        "method, target_result, err",
+        "method, target_result, error",
         [
             ("GET", "get", None),
             ("POST", "post", None),
-            ("PATCH", "patch", ArgumentError),
+            (
+                "PATCH",
+                "patch",
+                {
+                    "expected_exception": ArgumentError,
+                    "match": r"Bad Request: Unsupported Method .*",
+                },
+            ),
         ],
     )
     def test_application_helper(
-        self, method: str, target_result: str, err: Type[Exception] | None
+        self, method: str, target_result: str, error: Mapping | None
     ):
         class _Server(ExecutorWSGIServer):
             def do_get(self, environ: Mapping):
@@ -192,24 +199,40 @@ class TestServer:
         )
         mock_env = {**self.mock_env, "REQUEST_METHOD": method}
 
-        if err:
-            with pytest.raises(err):
+        if error:
+            with pytest.raises(**error):
                 server.application_helper(mock_env)
         else:
             res = server.application_helper(mock_env)
             assert res == target_result
 
     @pytest.mark.parametrize(
-        "options, slug, target_checker, err",
+        "options, slug, target_checker, error",
         [
-            ({}, "/env", None, ArgumentError),
+            (
+                {},
+                "/env",
+                None,
+                {
+                    "expected_exception": ArgumentError,
+                    "match": "Bad Request: Cannot access ENV",
+                },
+            ),
             (
                 {DefaultVars.IS_LOCAL: True},
                 "/env",
                 lambda x: isinstance(x, Mapping),
                 None,
             ),
-            ({}, "/everything-else", None, ArgumentError),
+            (
+                {},
+                "/everything-else",
+                None,
+                {
+                    "expected_exception": ArgumentError,
+                    "match": r"Bad Request: Cannot access [\S]+ with method GET",
+                },
+            ),
         ],
     )
     def test_get(
@@ -217,7 +240,7 @@ class TestServer:
         options: Mapping,
         slug: str,
         target_checker: Callable | None,
-        err: Type[Exception] | None,
+        error: Mapping | None,
     ):
         mock_env = {**self.mock_env, "PATH_INFO": slug}
 
@@ -227,24 +250,31 @@ class TestServer:
             settings=DefaultVars(**options),
             bind_and_activate=self.bind,
         )
-        if err:
-            with pytest.raises(err):
+        if error:
+            with pytest.raises(**error):
                 server.do_get(mock_env)
         else:
             assert target_checker(server.do_get(mock_env))
 
     @pytest.mark.parametrize(
-        "slug, target_checker, err",
+        "slug, target_checker, error",
         [
             ("/run", lambda x: x == [{}], None),
-            ("/everything-else", None, ArgumentError),
+            (
+                "/everything-else",
+                None,
+                {
+                    "expected_exception": ArgumentError,
+                    "match": r"Bad Request: Cannot access [\S]+ with method POST",
+                },
+            ),
         ],
     )
     def test_post(
-        self, slug: str, target_checker: Callable | None, err: Type[Exception] | None
+        self, slug: str, target_checker: Callable | None, error: Mapping | None
     ):
         class _Server(ExecutorWSGIServer):
-            def execute(self, config_str: bytes) -> List[Mapping]:
+            def execute(self, config_bytes: bytes) -> List[Mapping]:
                 return [{}]
 
         mock_env = {**self.mock_env, "PATH_INFO": slug}
@@ -256,8 +286,8 @@ class TestServer:
             settings=DefaultVars(),
             bind_and_activate=self.bind,
         )
-        if err:
-            with pytest.raises(err):
+        if error:
+            with pytest.raises(**error):
                 server.do_post(mock_env)
         else:
             assert target_checker(server.do_post(mock_env))
@@ -297,6 +327,47 @@ class TestServer:
         command = server._subprocess_command[1:]
         # we don't want to test the executable path
         assert command == target_command
+
+    @pytest.mark.parametrize(
+        "config_bytes, error",
+        [
+            # correct execution
+            (
+                json.dumps(
+                    {
+                        "code": "@tracer('a', 'b')\ndef test(a, b, c):\n    a = a * c\n    b = b * c\n    c = c * c\n    return a + b * c\n\ntest(7, 9, 11)",
+                        "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                    }
+                ).encode(),
+                None,
+            ),
+            # error execution in code
+            (
+                json.dumps(
+                    {
+                        "code": "@tracers('a', 'b')\ndef test(a, b, c):\n    a = a * c\n    b = b * c\n    c = c * c\n    return a + b * c\n\ntest(7, 9, 11)",
+                        "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                    }
+                ).encode(),
+                {
+                    "expected_exception": ExecutionError,
+                    "match": r"Cannot unload execution subprocess result. Error might have occurred in the execution: .*",
+                },
+            ),
+        ],
+    )
+    def test_execute(self, config_bytes: bytes, error: Mapping | None):
+        server = ExecutorWSGIServer(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=self.default_settings,
+            bind_and_activate=self.bind,
+        )
+        if error:
+            with pytest.raises(**error):
+                server.execute(config_bytes)
+        else:
+            server.execute(config_bytes)
 
 
 class TestResultFormatter:
