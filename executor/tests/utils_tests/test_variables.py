@@ -35,7 +35,6 @@ class TestVariables:
             (DefaultVars.LOGGER, "shell_debug", shell_debug_logger),
             (DefaultVars.EXEC_TIME_OUT, "9", 9),
             (DefaultVars.EXEC_MEM_OUT, "200", 200),
-            (DefaultVars.LOG_CMD_OUTPUT, "False", False),
             (DefaultVars.IS_LOCAL, "True", True),
             (DefaultVars.RAND_SEED, "10", 10),
             (DefaultVars.RAND_SEED, "None", None),

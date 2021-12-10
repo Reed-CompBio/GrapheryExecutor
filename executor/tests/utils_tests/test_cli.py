@@ -64,7 +64,6 @@ class TestArgparse:
         [
             (h, k, v)
             for h, k, v in (
-                (DefaultVars.LOG_CMD_OUTPUT, None, True),
                 (DefaultVars.EXEC_TIME_OUT, 10, 10),
                 (DefaultVars.EXEC_MEM_OUT, 200, 200),
                 (DefaultVars.IS_LOCAL, None, True),

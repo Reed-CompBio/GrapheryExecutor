@@ -79,7 +79,6 @@ class _DefaultVarsFields(Protocol):
 
     EXEC_TIME_OUT: ClassVar[str]
     EXEC_MEM_OUT: ClassVar[str]
-    LOG_CMD_OUTPUT: ClassVar[str]
     IS_LOCAL: ClassVar[str]
     RAND_SEED: ClassVar[str]
     FLOAT_PRECISION: ClassVar[str]
@@ -112,7 +111,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     EXEC_TIME_OUT = "EXEC_TIME_OUT"
     EXEC_MEM_OUT = "EXEC_MEM_OUT"
-    LOG_CMD_OUTPUT = "LOG_CMD_OUTPUT"
     IS_LOCAL = "IS_LOCAL"
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
@@ -132,7 +130,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         #
         EXEC_TIME_OUT: 5,
         EXEC_MEM_OUT: 100,
-        LOG_CMD_OUTPUT: True,
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
@@ -175,10 +172,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         ),
     }
     general_shell_var = {
-        LOG_CMD_OUTPUT: (
-            ("-l", "--log-out"),
-            {"default": vars[LOG_CMD_OUTPUT], "action": "store_true"},
-        ),
         EXEC_TIME_OUT: (
             ("-t", "--time-out"),
             {
@@ -216,7 +209,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             {"default": vars[TARGET_VERSION], "type": str},
         ),
         LOGGER: (
-            ("-g", "--logger"),
+            ("-l", "--logger"),
             {
                 "default": vars[LOGGER],
                 "choices": [*AVAILABLE_LOGGERS.values()],

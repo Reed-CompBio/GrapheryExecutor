@@ -30,7 +30,6 @@ from typing import (
 )
 from contextlib import redirect_stdout, redirect_stderr
 
-from .logger import void_logger
 from .recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
 
@@ -306,14 +305,9 @@ class Controller(Generic[_T]):
         self._default_settings = default_settings
 
         # register logger
-        if options.get(
-            DefaultVars.LOG_CMD_OUTPUT,
-        ):
-            self._logger: Logger = options.get(
-                "logger", options.get(default_settings.LOGGER)
-            )
-        else:
-            self._logger = void_logger
+        self._logger: Logger = options.get(
+            "logger", options.get(default_settings.LOGGER)
+        )
 
         # register control layers
         self._init_layers: List[LAYER_TYPE] = [*self._make_init_layers()]

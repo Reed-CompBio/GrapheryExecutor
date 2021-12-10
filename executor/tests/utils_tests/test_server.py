@@ -298,7 +298,6 @@ class TestServer:
             (
                 DefaultVars(),
                 [
-                    "-l",
                     "-t",
                     "5",
                     "-m",
@@ -310,7 +309,7 @@ class TestServer:
                     "4",
                     "-v",
                     "3.0.0a0",
-                    "-g",
+                    "-l",
                     "shell_debug",
                     "local",
                 ],

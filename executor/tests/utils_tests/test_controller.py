@@ -162,15 +162,6 @@ class TestGraphController:
                 eq,
             ),
             (
-                {
-                    **{n: getLogger("test_logger") for n in ["logger", "_logger"]},
-                    DefaultVars.LOG_CMD_OUTPUT: False,
-                    "_logger": void_logger,
-                },
-                "_logger",
-                eq,
-            ),
-            (
                 {**{n: True for n in [DefaultVars.IS_LOCAL, "_is_local"]}},
                 "_is_local",
                 eq,
