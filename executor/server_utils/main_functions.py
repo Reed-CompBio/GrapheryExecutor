@@ -126,7 +126,9 @@ class ExecutorWSGIServer(WSGIServer):
                 )
                 return self.execute(request_body)
             case _:
-                raise ArgumentError("Bad Request: Wrong Methods.")
+                raise ArgumentError(
+                    f"Bad Request: Cannot access {slug} with method POST"
+                )
 
     @property
     def _subprocess_command(self) -> List[str]:
@@ -141,7 +143,7 @@ class ExecutorWSGIServer(WSGIServer):
             if self.settings.var_arg_has_value(k):
                 args.append(str(self.settings[k]))
             if k == self.settings.LOGGER:
-                args.append("shell_info")
+                args.append("shell_debug")
             if k == self.settings.TARGET_VERSION:
                 args.append(SERVER_VERSION)
 
