@@ -141,14 +141,14 @@ class ExecutorWSGIServer(WSGIServer):
             if self.settings.var_arg_has_value(k):
                 args.append(str(self.settings[k]))
             if k == self.settings.LOGGER:
-                args.append("shell_debug")
+                args.append("shell_info")
             if k == self.settings.TARGET_VERSION:
                 args.append(SERVER_VERSION)
 
         args.append(SHELL_LOCAL_PARSER_NAME)
         return args
 
-    def execute(self, config_str: bytes) -> List[Mapping]:
+    def execute(self, config_bytes: bytes) -> List[Mapping]:
         command = self._subprocess_command
         self.logger.debug(f"opening subprocess with command {command}")
         proc = subprocess.Popen(
@@ -159,7 +159,7 @@ class ExecutorWSGIServer(WSGIServer):
         )
         try:
             stdout, stderr = proc.communicate(
-                config_str,
+                config_bytes,
                 timeout=self.settings[self.settings.EXEC_TIME_OUT],
             )
             self.logger.info(f"finished running {command} successfully")
@@ -168,15 +168,24 @@ class ExecutorWSGIServer(WSGIServer):
             proc.kill()
             stdout, stderr = proc.communicate()
             raise ExecutionError(
-                f"Error happened in subprocess. Error: {e}", f"{stdout}\n{stderr}"
+                f"Error happened during execution subprocess. Error: {e}",
+                f"{stdout}\n{stderr}",
             )
 
+        if not stdout:
+            raise ExecutionError(
+                "Empty execution result. Error might have occurred in the execution.",
+                f"{stderr}",
+            )
         stdout, stderr = stdout.decode(), stderr.decode()
 
         try:
             res = json.loads(stdout)
         except json.JSONDecodeError:
-            raise ExecutionError(stdout[: stdout.index("\n")], f"{stdout}\n{stderr}")
+            raise ExecutionError(
+                f"Cannot unload execution subprocess result. Error might have occurred in the execution: {stdout}",
+                f"{stderr}",
+            )
 
         return res
 

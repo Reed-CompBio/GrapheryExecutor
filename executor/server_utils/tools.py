@@ -17,6 +17,12 @@ class ExecutionError(ValueError):
         super(ExecutionError, self).__init__(msg)
         self.traceback = traceback
 
+    def __str__(self):
+        return f"{super(ExecutionError, self).__str__()}\n{self.traceback}"
+
+    def __repr__(self):
+        return f"{super(ExecutionError, self).__repr__()}\n{self.traceback}"
+
 
 class ArgumentError(ValueError):
     pass
