@@ -1,4 +1,5 @@
 import io
+from contextlib import redirect_stdout
 from copy import deepcopy
 from logging import getLogger
 from operator import eq
@@ -9,7 +10,7 @@ import pytest
 from platform import platform
 
 from ...settings import DefaultVars, SERVER_VERSION
-from ...utils.controller import GraphController
+from ...utils.controller import GraphController, ControllerResultAnnouncer
 
 _platform = platform()
 _versioned_settings = DefaultVars(**{DefaultVars.TARGET_VERSION: SERVER_VERSION})
@@ -20,6 +21,7 @@ def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
         default_settings=_versioned_settings,
         **kwargs,
     ).init()
+    # set is local when only running main
     ctrl._is_local = True
     return ctrl
 
@@ -252,3 +254,27 @@ class TestGraphController:
         )
         with pytest.raises(SystemExit):
             ctrl.main()
+
+    def test_main_options(self):
+        format_val = "format"
+
+        class _SubC(self.controller):
+            def format_result(self, result):
+                return format_val
+
+        code = "a = 1"
+        graph_data = {}
+        stream = io.StringIO()
+        ctrl = make_test_controller_instance(
+            _SubC,
+            code=code,
+            graph_data=graph_data,
+            announcer=ControllerResultAnnouncer(stream),
+        )
+        with redirect_stdout(stream):
+            assert ctrl.main(formats=True) == format_val
+            assert not stream.getvalue()
+
+        with redirect_stdout(stream):
+            ctrl.main(formats=True, announces=True)
+        assert stream.getvalue() == format_val

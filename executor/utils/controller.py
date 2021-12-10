@@ -362,7 +362,7 @@ class Controller(Generic[_T]):
         self._stderr_redirector = redirect_stderr(self._stderr)
 
         # formatter
-        self._announcer = options.get("formatter", ControllerResultAnnouncer())
+        self._announcer = options.get("announcer", ControllerResultAnnouncer())
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
