@@ -9,8 +9,7 @@ import pytest
 from platform import platform
 
 from ...settings import DefaultVars, SERVER_VERSION
-from ...utils.controller import GraphController, ErrorResult
-from ...utils.logger import void_logger
+from ...utils.controller import GraphController
 
 _platform = platform()
 _versioned_settings = DefaultVars(**{DefaultVars.TARGET_VERSION: SERVER_VERSION})
@@ -23,12 +22,6 @@ def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
     ).init()
     ctrl._is_local = True
     return ctrl
-
-
-def assert_no_error(res):
-    if isinstance(res, ErrorResult):
-        raise ValueError(res.error_traceback)
-    return True
 
 
 class TestGraphController:
@@ -57,8 +50,8 @@ class TestGraphController:
         ctrl = make_test_controller_instance(
             self.controller, code=code, graph_data=graph_data
         )
-        result = ctrl.main()
-        assert isinstance(result, ErrorResult)
+        with pytest.raises(SystemExit):
+            ctrl.main()
 
     @pytest.mark.parametrize(
         "code, graph_data",
@@ -87,7 +80,7 @@ class TestGraphController:
             self.controller, code=code, graph_data=graph_data
         )
         result = ctrl.main()
-        assert assert_no_error(result) and isinstance(result, list)
+        assert isinstance(result, list)
 
     def test_out_fd_capture(self):
         intended_result = dedent(
@@ -106,8 +99,7 @@ class TestGraphController:
             graph_data=graph_data,
             custom_ns={"var1": 1, "var2": 2},
         )
-        result = ctrl.main()
-        assert_no_error(result)
+        ctrl.main()
         assert ctrl.stdout.getvalue() == intended_result
 
     def test_custom_ns_import(self):
@@ -125,7 +117,6 @@ class TestGraphController:
             custom_ns={"var1": 1, "var2": 2},
         )
         result = ctrl.main()
-        assert_no_error(result)
         assert ctrl.stdout.getvalue() == "1\n2\n"
 
     def test_err_fd_capture(self):
@@ -150,7 +141,6 @@ class TestGraphController:
             custom_ns={"err": err},
         )
         result = ctrl.main()
-        assert_no_error(result)
         assert ctrl.stderr.getvalue() == intended_result
 
     @pytest.mark.parametrize(
@@ -210,15 +200,13 @@ class TestGraphController:
             self.controller, code=code, graph_data=graph_data, options=options
         )
         assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
-        result = ctrl.main()
-        assert_no_error(result)
+        ctrl.main()
 
         ctrl = make_test_controller_instance(
             self.controller, code=code, graph_data=graph_data, **options
         )
         assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
-        result = ctrl.main()
-        assert_no_error(result)
+        ctrl.main()
 
     def test_wrong_version(self):
         code = ""
@@ -262,8 +250,5 @@ class TestGraphController:
         ctrl = make_test_controller_instance(
             self.controller, code=code, graph_data=graph_data
         )
-        result = ctrl.main()
-        assert isinstance(result, ErrorResult) and (
-            "is not supported by Executor" in result.error_traceback
-            or "is not defined" in result.error_traceback
-        )
+        with pytest.raises(SystemExit):
+            ctrl.main()

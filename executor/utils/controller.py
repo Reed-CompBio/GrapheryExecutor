@@ -43,6 +43,8 @@ from ..settings import (
     SERVER_VERSION,
     POST_ERROR_CODE,
     PREP_ERROR_CODE,
+    RUNNER_ERROR_CODE,
+    CTRL_ERROR_CODE,
 )
 
 try:
@@ -57,9 +59,9 @@ _PLATFORM_STR = platform()
 __all__ = [
     "Controller",
     "GraphController",
-    "ErrorResult",
+    "RunnerError",
     "LayerContext",
-    "ControllerResultFormatter",
+    "ControllerResultAnnouncer",
 ]
 
 LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
@@ -188,7 +190,7 @@ class _ModuleRestrict(LayerContext):
         pass
 
 
-class ControllerResultFormatter:
+class ControllerResultAnnouncer:
     def __init__(self, output=_sys.stdout):
         self._out = output
 
@@ -200,12 +202,14 @@ class ControllerResultFormatter:
     ) -> NoReturn:
         from traceback import format_exc
 
-        self.write(f"An error occurs with exit code {error_code}. Error: {exception}\n")
-        if trace:
-            self.write(trace)
-        else:
-            self.write(format_exc())
-        exit(error_code)
+        e = SystemExit(
+            f"An error occurs with exit code {error_code}. Error: {exception}\n"
+            f"trace: \n"
+            f"{trace if trace else format_exc()}"
+        )
+        self.write(str(e))
+
+        raise e
 
     def show_result(self, result: str) -> None:
         self.write(result)
@@ -213,13 +217,13 @@ class ControllerResultFormatter:
 
 class _ResourceRestrict(LayerContext):
     def _cpu_time_out_helper(self, sig_num, __):
-        self._ctrl.formatter.show_error(
+        self._ctrl.announcer.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
             error_code=CPU_OUT_EXIT_CODE,
         )
 
     def _mem_consumed_helper(self, sig_num, __):
-        self._ctrl.formatter.show_error(
+        self._ctrl.announcer.show_error(
             ValueError(f"Allocated MEM size exhausted. Signal num: {sig_num}"),
             error_code=MEM_OUT_EXIT_CODE,
         )
@@ -261,10 +265,9 @@ class _RandomContext(LayerContext):
         self._ctrl.logger.debug("reset random seed")
 
 
-class ErrorResult:
-    def __init__(self, exception: Exception, error_traceback: str):
-        self.exception = exception
-        self.error_traceback = error_traceback
+class RunnerError(Exception):
+    def __init__(self, msg):
+        super(RunnerError, self).__init__(msg)
 
 
 class Controller(Generic[_T]):
@@ -359,7 +362,7 @@ class Controller(Generic[_T]):
         self._stderr_redirector = redirect_stderr(self._stderr)
 
         # formatter
-        self._formatter = options.get("formatter", ControllerResultFormatter())
+        self._announcer = options.get("formatter", ControllerResultAnnouncer())
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -624,7 +627,7 @@ class Controller(Generic[_T]):
         try:
             self._init_process()
         except Exception as e:
-            self._formatter.show_error(e, error_code=INIT_ERROR_CODE)
+            self._announcer.show_error(e, error_code=INIT_ERROR_CODE)
 
         return self
 
@@ -637,7 +640,7 @@ class Controller(Generic[_T]):
         try:
             self._prep_process()
         except Exception as e:
-            self._formatter.show_error(e, error_code=PREP_ERROR_CODE)
+            self._announcer.show_error(e, error_code=PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -652,9 +655,9 @@ class Controller(Generic[_T]):
         try:
             self._post_process()
         except Exception as e:
-            self._formatter.show_error(e, error_code=POST_ERROR_CODE)
+            self._announcer.show_error(e, error_code=POST_ERROR_CODE)
 
-    def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
+    def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T:
         """
         run the internal runner
         :param args: runner args
@@ -670,12 +673,17 @@ class Controller(Generic[_T]):
             # but this is going to mess up the tests
             from traceback import format_exc
 
-            self._logger.debug("unknown exception occurs in execution")
-            result = ErrorResult(e, format_exc())
-            self._logger.error(result.error_traceback)
+            self._logger.debug("exception occurs in runner execution")
+            self._announcer.show_error(
+                RunnerError(e), trace=format_exc(), error_code=RUNNER_ERROR_CODE
+            )
+            return
 
         self._logger.debug("finished runner successfully")
         # surprised https://youtrack.jetbrains.com/issue/PY-24273
+        return result
+
+    def format_result(self, result):
         return result
 
     # ===== basic structures end =====
@@ -691,16 +699,37 @@ class Controller(Generic[_T]):
         """
         return self(*args, **kwargs)
 
-    def main(self, *args: _P.args, **kwargs: _P.kwargs) -> _T | ErrorResult:
+    def main(
+        self,
+        *args: _P.args,
+        formats: bool = False,
+        announces: bool = False,
+        **kwargs: _P.kwargs,
+    ) -> _T:
         """
         The main function to be called
+        :param announces:
+        :param formats:
         :param args:
         :param kwargs:
         :return: whatever the runner returns
         """
         self._logger.debug("started main with \n" f"args: {args}\n" f"kwargs: {kwargs}")
         with self as ctrl:
-            return ctrl._run(*args, **kwargs)
+            result = ctrl._run(*args, **kwargs)
+
+        if formats:
+            self._logger.debug("formatting result from main")
+            try:
+                result = self.format_result(result)
+            except Exception as e:
+                self._announcer.show_error(e, error_code=CTRL_ERROR_CODE)
+
+        if announces:
+            self._logger.debug("announcing result from main")
+            self._announcer.show_result(result)
+
+        return result
 
     # ===== main fn end =====
     @property
@@ -740,8 +769,8 @@ class Controller(Generic[_T]):
         return self._rand_seed
 
     @property
-    def formatter(self):
-        return self._formatter
+    def announcer(self):
+        return self._announcer
 
 
 class GraphController(Controller[List[MutableMapping]]):
@@ -878,3 +907,6 @@ class GraphController(Controller[List[MutableMapping]]):
         self._logger.debug("final change list: \n" f"{result}")
 
         return result
+
+    def format_result(self, result):
+        return json.dumps(result)

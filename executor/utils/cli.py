@@ -9,15 +9,10 @@ from executor.settings import (
     SHELL_PARSER_GROUP_NAME,
     SHELL_SERVER_PARSER_NAME,
     SHELL_LOCAL_PARSER_NAME,
-    RUNNER_ERROR_CODE,
-    CTRL_ERROR_CODE,
     SERVER_VERSION,
     PROG_NAME,
 )
-from executor.utils.controller import (
-    GraphController,
-    ErrorResult,
-)
+from executor.utils.controller import GraphController
 
 
 def arg_parser(
@@ -75,25 +70,8 @@ def _local_run(settings: DefaultVars) -> None:
         options=options,
     ).init()
 
-    result = ctrl.main()
-
-    if isinstance(result, ErrorResult):
-        # Ehhh ugly
-        logger.debug("local run received error result from controller main")
-        ctrl.formatter.show_error(
-            result.exception,
-            trace=result.error_traceback,
-            error_code=RUNNER_ERROR_CODE,
-        )
-    else:
-        logger.debug("local run received valid result from controller main")
-        try:
-            ctrl.formatter.show_result(json.dumps(result))
-        except Exception as e:
-            ctrl.formatter.show_error(
-                ValueError(f"Server error when handling exec result. Error: {e}"),
-                error_code=CTRL_ERROR_CODE,
-            )
+    ctrl.main(formats=True, announces=True)
+    logger.debug("local run received valid result from controller main")
 
 
 def _server_run(settings: DefaultVars) -> None:
