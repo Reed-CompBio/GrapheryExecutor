@@ -6,7 +6,6 @@ from textwrap import dedent
 from .recorder_helper import RecorderEQ
 from .test_controller import make_test_controller_instance
 from executor.utils.controller import GraphController
-from ...utils.logger import void_logger
 from ...utils.recorder import Recorder
 
 
