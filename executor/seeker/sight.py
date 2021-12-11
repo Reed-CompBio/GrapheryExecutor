@@ -274,7 +274,7 @@ class Tracer:
             return self._wrap_function(function_or_class)
 
     @classmethod
-    def look_at(cls, func: FunctionType):
+    def peek(cls, func: FunctionType):
         """
         look at function's output and record it in the change list
         @param func: wrapped function

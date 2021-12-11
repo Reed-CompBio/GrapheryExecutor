@@ -883,6 +883,9 @@ class GraphController(Controller[List[MutableMapping]]):
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
 
+        self._update_globals("peek", self._tracer.peek)
+        self._logger.debug("collects `peek` helper")
+
         self._update_globals("graph", self._graph)
         self._logger.debug(f"updated graph in user globals with {self._graph}")
 

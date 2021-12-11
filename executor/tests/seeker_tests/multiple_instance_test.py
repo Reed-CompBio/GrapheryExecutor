@@ -20,7 +20,7 @@ class TempClass:
     def __init__(self):
         self.value = 0
 
-    @tracer.look_at
+    @tracer.peek
     def get_value(self):
         # TODO warp all the record write/read into functions, since the number of fields is limited
         # TempClass.recorder.add_ac_to_last_record('get value %s' % self.value)
@@ -29,7 +29,7 @@ class TempClass:
     # TODO in the graph objects, I think you can start will getters first.
     #  setters can wait
     # TODO create a decorator that does this
-    @tracer.look_at
+    @tracer.peek
     def set_value(self, value):
         # TODO same as noted above
         # TempClass.recorder.add_ac_to_last_record('set value %s' % self.value)
