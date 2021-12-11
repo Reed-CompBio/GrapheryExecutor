@@ -10,6 +10,7 @@ from wsgiref.simple_server import WSGIRequestHandler
 
 import pytest
 
+from executor import SERVER_VERSION
 from executor.server_utils.main_functions import ExecutorWSGIServer
 from executor.server_utils.tools import ExecutionError, ArgumentError, ServerError
 from executor.settings import DefaultVars
@@ -308,7 +309,7 @@ class TestServer:
                     "-f",
                     "4",
                     "-v",
-                    "3.0.0a0",
+                    SERVER_VERSION,
                     "-l",
                     "shell_debug",
                     "local",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from copy import deepcopy
 
 import pytest
@@ -19,7 +18,6 @@ class TestVariables:
     def reset_environ(self, original_environ):
         os.environ.clear()
         os.environ.update(original_environ)
-        warnings.warn(str(os.environ))
 
     @pytest.mark.parametrize(
         "env_name, env_value, target",
@@ -48,7 +46,6 @@ class TestVariables:
     def test_read_from_env(self, reset_environ, env_name, env_value, target):
         os.environ[DefaultVars.make_shell_env_name(env_name)] = env_value
         s = DefaultVars()
-        s.read_from_env(env_name)
         res = s[env_name]
         assert (
             res == target

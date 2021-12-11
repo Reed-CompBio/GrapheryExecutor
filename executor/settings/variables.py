@@ -221,7 +221,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     def __init__(self, **kwargs):
         self.vars = {**self.vars, **kwargs}
-        self.read_from_env()
+        self.read_from_env(all_args=True)
         self.v = _VarGetter(self)
 
     def __getitem__(self, item: str):
