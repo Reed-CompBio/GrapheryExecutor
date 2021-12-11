@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-import sys
-from typing import Mapping, List, Set
+from typing import Mapping, List
 
-from executor.utils.recorder import Recorder
+from executor.utils.recorder import Recorder, identifier_to_string
 
 
 class Record:
-    def __init__(self, record_eq: RecorderEQ):
+    def __init__(self, record_eq: RecorderEQ, line: int = None):
         self.record_eq = record_eq
+        self.line = line
         self.variables = None
         self.access = None
         self.stdout = None
 
         self._construct_str = None
 
-    def add_variable(self, var: str) -> Record:
+    def add_variable(self, *args) -> Record:
         if self.variables is None:
             self.variables = set()
-        self.variables.add(var)
+        self.variables.add(identifier_to_string(args))
         return self
 
     def add_access(self, var: str) -> Record:
@@ -37,19 +37,25 @@ class Record:
         return self.record_eq
 
     def check(self, record: Mapping) -> None | str:
-        print(record, file=sys.stderr)
+        if self.line is not None:
+            if self.line != (actual_line := record[Recorder._LINE_HEADER]):
+                return f"expected line number {self.line} does not match actual line {actual_line}"
+
         actual_vars: Mapping | None = record[Recorder._VARIABLE_HEADER]
         if actual_vars is not None:
-            actual_vars: Set = set(actual_vars.keys())
-            if (a_l := len(actual_vars)) != (t_l := len(self.variables)):
-                return (
-                    f"actual variable length {a_l} does not match target length {t_l}"
-                )
-            if actual_vars != self.variables:
-                return (
-                    f"actual vars differ from target vars, diff: "
-                    f"{actual_vars if self.variables is None else actual_vars ^ self.variables}"
-                )
+            for k, v in actual_vars.items():
+                if (
+                    v.get(Recorder._TYPE_HEADER) != Recorder._INIT_TYPE_STRING
+                    and k not in self.variables
+                ):
+                    return f"unexpected variable {repr(k)} shows"
+
+            for k in self.variables or ():
+                if (
+                    actual_vars.get(k).get(Recorder._TYPE_HEADER)
+                    == Recorder._INIT_TYPE_STRING
+                ):
+                    return f"expected value {repr(k)} is not in actual result {actual_vars.keys()}"
 
         actual_access = record[Recorder._ACCESS_HEADER]
         if actual_access is not None and (a_l := len(actual_access)) != (
@@ -70,11 +76,11 @@ class Record:
         if self._construct_str is None:
             candidates = []
             for v in self.variables or ():
-                candidates.append(f"\n.add_variable({v})")
+                candidates.append(f"\n.add_variable({repr(v)})")
             for a in self.access or ():
                 candidates.append(f"\n.add_access({repr(a)})")
             for s in self.stdout or ():
-                candidates.append(f"\n.add_stdout({s})")
+                candidates.append(f"\n.add_stdout({repr(s)})")
             self._construct_str = "".join(candidates)
 
         return self._construct_str
@@ -90,17 +96,18 @@ class RecorderEQ:
     def __init__(self):
         self.check_queue: List[Record] = []
 
-    def add_record(self) -> Record:
-        self.check_queue.append(Record(self))
+    def add_record(self, line: int = None) -> Record:
+        self.check_queue.append(Record(self, line))
         return self.check_queue[-1]
 
-    def use_with(self) -> RecorderEQ:
+    def exit_with(self) -> RecorderEQ:
         return self.add_record().back()
+
+    def start_init(self) -> RecorderEQ:
+        return self.add_record(0).back()
 
     def check(self, records: List[Mapping]) -> None:
         # remove init records and don't check that by default, maybe not a good idea?
-        records = records[1:]
-
         record_len = len(records)
         target_len = len(self.check_queue)
 
