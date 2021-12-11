@@ -3,11 +3,15 @@ from __future__ import annotations
 from copy import deepcopy
 from textwrap import dedent
 
-import pytest
-
 from .recorder_helper import RecorderEQ
 from .test_controller import make_test_controller_instance
 from executor.utils.controller import GraphController
+
+
+def run_main(cls, **kwargs):
+    ctrl = make_test_controller_instance(cls, **kwargs)
+    ctrl.main()
+    return ctrl
 
 
 class TestRecorder:
@@ -26,12 +30,11 @@ class TestRecorder:
                 print('c')
             """
         )
-        ctrl = make_test_controller_instance(
+        ctrl = run_main(
             self.controller,
             code=code,
             graph_data=self.default_graph_data,
         )
-        ctrl.main()
 
         # fmt: off
         target = RecorderEQ()\
@@ -51,12 +54,11 @@ class TestRecorder:
                 i = 10
             """
         )
-        ctrl = make_test_controller_instance(
+        ctrl = run_main(
             self.controller,
             code=code,
             graph_data=self.default_graph_data,
         )
-        ctrl.main()
 
         # fmt: off
         target = RecorderEQ()\
@@ -82,12 +84,11 @@ class TestRecorder:
                 k = i ** 0.5
             """
         )
-        ctrl = make_test_controller_instance(
+        ctrl = run_main(
             self.controller,
             code=code,
             graph_data=self.default_graph_data,
         )
-        ctrl.main()
 
         # fmt: off
         target = RecorderEQ() \
@@ -105,6 +106,39 @@ class TestRecorder:
                 .back()\
             .add_record().back() \
             .exit_with()  # to handle with exit
+        # fmt: on
+
+        target.check(ctrl.recorder.final_change_list)
+
+    def test_peek(self):
+        code = dedent(
+            """\
+            @tracer.peek
+            def compute(a, b, c):
+                a = a ** a
+                b = b * a - c
+                return a * b + c
+            
+            with tracer('j', 'k'):
+                i = compute(2, 3, 5)
+                j = compute(7, 9, 10) * compute(3, 2, -1)
+                k = 11 - 7
+            """
+        )
+
+        ctrl = run_main(
+            self.controller,
+            code=code,
+            graph_data=self.default_graph_data,
+        )
+
+        # fmt: off
+        target = RecorderEQ()\
+            .start_init()\
+            .add_record().add_access('i').back()\
+            .add_record().add_variable('', 'j').add_access(1).add_access(2).back()\
+            .add_record().add_variable('', 'j').add_variable('', 'k').back()\
+            .exit_with()
         # fmt: on
 
         target.check(ctrl.recorder.final_change_list)

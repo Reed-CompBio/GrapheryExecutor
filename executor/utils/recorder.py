@@ -501,7 +501,7 @@ class Recorder:
             self.STDOUT_HEADER: None,
         }
 
-    def _process_change_list(self) -> List[MutableMapping]:
+    def _process_change_list(self) -> List[Dict]:
         if self._final_changes is None:
             init_object = self._init_result_object
 
@@ -537,7 +537,7 @@ class Recorder:
         return self._changes
 
     @property
-    def final_change_list(self) -> List[Mapping]:
+    def final_change_list(self) -> List[Dict]:
         return self._process_change_list()
 
     @property

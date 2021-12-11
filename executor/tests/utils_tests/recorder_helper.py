@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Mapping, List
+from typing import Mapping, List, Any
 
 from executor.utils.recorder import Recorder, identifier_to_string
 
@@ -21,10 +21,10 @@ class Record:
         self.variables.add(identifier_to_string(args))
         return self
 
-    def add_access(self, var: str) -> Record:
+    def add_access(self, var: Any) -> Record:
         if self.access is None:
             self.access = set()
-        self.variables.add(var)
+        self.access.add(var)
         return self
 
     def add_stdout(self, line, end: str = "\n") -> Record:
@@ -48,7 +48,7 @@ class Record:
                     v.get(Recorder.TYPE_HEADER) != Recorder.INIT_TYPE_STRING
                     and k not in self.variables
                 ):
-                    return f"unexpected variable {repr(k)} shows"
+                    return f"unexpected variable {repr(k)} shows but expected is {self.variables}"
 
             for k in self.variables or ():
                 if (
