@@ -1,0 +1,16 @@
+version: "3"  # optional since v1.27.0
+services:
+  web:
+    environment:
+      GE_SERVER_PORT: ${GE_SERVER_PORT-7590}
+      GE_ALLOW_OTHER_ORIGIN: ${GE_ALLOW_OTHER_ORIGIN-True}
+      GE_ACCEPTED_ORIGINS: ${GE_ACCEPTED_ORIGINS-["127.0.0.1"]}
+      GE_LOGGER: ${GE_LOGGER-shell_info}
+      GE_EXEC_TIME_OUT: ${GE_EXEC_TIME_OUT-5}
+      GE_EXEC_MEM_OUT: ${GE_EXEC_MEM_OUT-100}
+      GE_IS_LOCAL: ${GE_IS_LOCAL-False}
+      GE_RAND_SEED: ${GE_RAND_SEED-0}
+      GE_FLOAT_PRECISION: ${GE_FLOAT_PRECISION-4}
+    build: .
+    ports:
+      - "${GE_SERVER_PORT-7590}:${GE_SERVER_PORT-7590}"
