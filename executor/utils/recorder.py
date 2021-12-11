@@ -156,6 +156,7 @@ class Recorder:
         *,
         graph: Graph = None,
         stdout: StringIO = None,
+        float_precision: int = 10,
         logger: Logger = void_logger,
     ):
         self._changes: List[MutableMapping] = []
@@ -167,6 +168,7 @@ class Recorder:
         self._graph = graph
         self._stdout = stdout
         self._stdout_cache = []
+        self._float_precision = float_precision
 
     def assign_and_get_color(self, identifier_string: str) -> None:
         """
@@ -282,7 +284,10 @@ class Recorder:
 
     def _generate_repr(self, variable_state: Any) -> str:
         try:
-            repr_result = repr(variable_state)
+            if isinstance(variable_state, float):
+                repr_result = f"{{:.{self._float_precision}f}}".format(variable_state)
+            else:
+                repr_result = repr(variable_state)
         except Exception:
             repr_result = self._BAD_REPR_STRING
 

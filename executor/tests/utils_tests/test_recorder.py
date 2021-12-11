@@ -24,7 +24,7 @@ class TestRecorder:
         self.default_graph_data = {}
 
     def test_color_assignment(self):
-        r = Recorder(logger=void_logger)
+        r = Recorder()
         num = 20
         for i in range(num):
             r.register_variable(("", f"{i}"))
@@ -32,6 +32,12 @@ class TestRecorder:
         assert (
             len(set(r._color_mapping.values())) == len(r._DEFAULT_COLOR_MAPPING) + num
         ), f"duplicated coloring was generated"
+
+    def test_float_precision(self):
+        p = 7
+        r = Recorder(float_precision=p)
+        res = r._generate_repr(1 / 3)
+        assert len(res[res.index(".") + 1 :]) == p
 
     def test_stdout_capture(self):
         code = dedent(
