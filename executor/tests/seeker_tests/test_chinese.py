@@ -3,7 +3,6 @@
 # This program is distributed under the MIT license.
 
 from executor import seeker
-from executor.seeker import pycompat
 from .utils import (
     assert_output,
     VariableEntry,
@@ -37,8 +36,8 @@ def test_chinese():
                 CallEntry(),
                 LineEntry(),
                 VariableEntry("a"),
-                LineEntry(u'x = "失败"'),
-                VariableEntry(u"x", (u"'失败'" if pycompat.PY3 else None)),
+                LineEntry('x = "失败"'),
+                VariableEntry("x", ("'失败'")),
                 LineEntry(),
                 ReturnEntry(),
                 ReturnValueEntry("7"),

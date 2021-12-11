@@ -6,6 +6,8 @@ from textwrap import dedent
 from .recorder_helper import RecorderEQ
 from .test_controller import make_test_controller_instance
 from executor.utils.controller import GraphController
+from ...utils.logger import void_logger
+from ...utils.recorder import Recorder
 
 
 def run_main(cls, **kwargs):
@@ -20,6 +22,16 @@ class TestRecorder:
         self.controller._graph_builder = dict
 
         self.default_graph_data = {}
+
+    def test_color_assignment(self):
+        r = Recorder(logger=void_logger)
+        num = 20
+        for i in range(num):
+            r.register_variable(("", f"{i}"))
+
+        assert (
+            len(set(r._color_mapping.values())) == len(r._DEFAULT_COLOR_MAPPING) + num
+        ), f"duplicated coloring was generated"
 
     def test_stdout_capture(self):
         code = dedent(

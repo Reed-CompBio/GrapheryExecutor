@@ -7,8 +7,6 @@ import re
 
 from typing import Any, Callable, Iterable, Tuple, Type
 
-from .pycompat import ABC, string_types
-
 
 def _check_methods(C, *methods):
     mro = C.__mro__
@@ -23,7 +21,7 @@ def _check_methods(C, *methods):
     return True
 
 
-class WritableStream(ABC):
+class WritableStream(abc.ABC):
     @abc.abstractmethod
     def write(self, s):
         pass
@@ -95,11 +93,11 @@ def truncate(string, max_length):
     else:
         left = (max_length - 3) // 2
         right = max_length - 3 - left
-        return u"{}...{}".format(string[:left], string[-right:])
+        return "{}...{}".format(string[:left], string[-right:])
 
 
 def ensure_tuple(x):
-    if isinstance(x, Iterable) and not isinstance(x, string_types):
+    if isinstance(x, Iterable) and not isinstance(x, str):
         return tuple(x)
     else:
         return (x,)

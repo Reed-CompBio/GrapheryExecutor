@@ -1,13 +1,12 @@
 # Copyright 2019 Ram Rachum and collaborators.
 # This program is distributed under the MIT license.
-
+import inspect
 import textwrap
 import sys
 
 import pytest
 
 from executor import seeker
-from executor.seeker import pycompat
 
 
 def test_rejecting_coroutine_functions():
@@ -24,8 +23,8 @@ def test_rejecting_coroutine_functions():
     exec(code, namespace)
     foo = namespace["foo"]
 
-    assert pycompat.iscoroutinefunction(foo)
-    assert not pycompat.isasyncgenfunction(foo)
+    assert inspect.iscoroutinefunction(foo)
+    assert not inspect.isasyncgenfunction(foo)
     with pytest.raises(NotImplementedError):
         seeker.tracer()(foo)
 
@@ -44,7 +43,7 @@ def test_rejecting_async_generator_functions():
     exec(code, namespace)
     foo = namespace["foo"]
 
-    assert not pycompat.iscoroutinefunction(foo)
-    assert pycompat.isasyncgenfunction(foo)
+    assert not inspect.iscoroutinefunction(foo)
+    assert inspect.isasyncgenfunction(foo)
     with pytest.raises(NotImplementedError):
         seeker.tracer()(foo)

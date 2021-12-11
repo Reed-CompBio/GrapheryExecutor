@@ -10,7 +10,6 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 
 from . import utils
-from . import pycompat
 
 
 def needs_parentheses(source):
@@ -20,7 +19,7 @@ def needs_parentheses(source):
     return code("{}.x".format(source)) != code("({}).x".format(source))
 
 
-class BaseVariable(pycompat.ABC):
+class BaseVariable(abc.ABC):
     def __init__(self, source, exclude=()):
         self.source = source
         self.exclude = utils.ensure_tuple(exclude)
