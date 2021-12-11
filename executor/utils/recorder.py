@@ -498,6 +498,7 @@ class Recorder:
             if len(self._color_mapping) > len(self._DEFAULT_COLOR_MAPPING)
             else None,
             self._ACCESS_HEADER: None,
+            self._STDOUT_HEADER: None,
         }
 
     def _process_change_list(self) -> List[MutableMapping]:
