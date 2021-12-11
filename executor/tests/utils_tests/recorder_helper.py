@@ -38,32 +38,32 @@ class Record:
 
     def check(self, record: Mapping) -> None | str:
         if self.line is not None:
-            if self.line != (actual_line := record[Recorder._LINE_HEADER]):
+            if self.line != (actual_line := record[Recorder.LINE_HEADER]):
                 return f"expected line number {self.line} does not match actual line {actual_line}"
 
-        actual_vars: Mapping | None = record[Recorder._VARIABLE_HEADER]
+        actual_vars: Mapping | None = record[Recorder.VARIABLE_HEADER]
         if actual_vars is not None:
             for k, v in actual_vars.items():
                 if (
-                    v.get(Recorder._TYPE_HEADER) != Recorder._INIT_TYPE_STRING
+                    v.get(Recorder.TYPE_HEADER) != Recorder.INIT_TYPE_STRING
                     and k not in self.variables
                 ):
                     return f"unexpected variable {repr(k)} shows"
 
             for k in self.variables or ():
                 if (
-                    actual_vars.get(k).get(Recorder._TYPE_HEADER)
-                    == Recorder._INIT_TYPE_STRING
+                    actual_vars.get(k).get(Recorder.TYPE_HEADER)
+                    == Recorder.INIT_TYPE_STRING
                 ):
                     return f"expected value {repr(k)} is not in actual result {actual_vars.keys()}"
 
-        actual_access = record[Recorder._ACCESS_HEADER]
+        actual_access = record[Recorder.ACCESS_HEADER]
         if actual_access is not None and (a_l := len(actual_access)) != (
             t_l := len(self.access)
         ):
             return f"actual access length {a_l} does not match target length {t_l}"
 
-        actual_std = record[Recorder._STDOUT_HEADER]
+        actual_std = record[Recorder.STDOUT_HEADER]
         if actual_std != self.stdout:
             return (
                 f"actual stdout {actual_std} does not match target stdout {self.stdout}"
@@ -117,7 +117,7 @@ class RecorderEQ:
 
         for no, (target, record) in enumerate(zip(self.check_queue, records)):
             if target.check(record) is not None:
-                line = record.get(Recorder._LINE_HEADER)
+                line = record.get(Recorder.LINE_HEADER)
                 if res := target.check(record):
                     raise AssertionError(
                         f"the {no}th record at line {line} does not match the expected. Error: \n"

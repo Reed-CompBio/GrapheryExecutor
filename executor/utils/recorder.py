@@ -38,7 +38,7 @@ from .logger import void_logger
 from ..settings import IDENTIFIER_SEPARATOR
 
 
-__all__ = ["Recorder"]
+__all__ = ["Recorder", "identifier_to_string"]
 
 
 def identifier_to_string(identifier: Sequence[str]) -> str:
@@ -127,27 +127,27 @@ class Recorder:
         object: _OBJECT_TYPE_STRING,
     }
 
-    _INIT_TYPE_STRING = "init"
-    _REFERENCE_TYPE_STRING = "reference"
+    INIT_TYPE_STRING = "init"
+    REFERENCE_TYPE_STRING = "reference"
 
     _GRAPH_OBJECT_TYPES = set(_GRAPH_OBJECT_MAPPING.values())
     _SINGULAR_TYPES = set(_SINGULAR_MAPPING.values())
     _LINEAR_CONTAINER_TYPES = set(_LINEAR_CONTAINER_MAPPING.values())
     _PAIR_CONTAINER_TYPES = set(_PAIR_CONTAINER_MAPPING.values())
 
-    _TYPE_HEADER = "type"
-    _COLOR_HEADER = "color"
-    _REPR_HEADER = "repr"
-    _GRAPH_ID_HEADER = "id"
-    _GRAPH_PROPERTY_HEADER = "properties"
-    _PYTHON_ID_HEADER = "python_id"
+    TYPE_HEADER = "type"
+    COLOR_HEADER = "color"
+    REPR_HEADER = "repr"
+    GRAPH_ID_HEADER = "id"
+    GRAPH_PROPERTY_HEADER = "properties"
+    PYTHON_ID_HEADER = "python_id"
 
-    _LINE_HEADER = "line"
-    _VARIABLE_HEADER = "variables"
-    _ACCESS_HEADER = "accesses"
-    _STDOUT_HEADER = "stdout"
-    _PAIR_KEY_HEADER = "key"
-    _PAIR_VALUE_HEADER = "value"
+    LINE_HEADER = "line"
+    VARIABLE_HEADER = "variables"
+    ACCESS_HEADER = "accesses"
+    STDOUT_HEADER = "stdout"
+    PAIR_KEY_HEADER = "key"
+    PAIR_VALUE_HEADER = "value"
 
     _BAD_REPR_STRING = "BAD REPR FUNCTION"
 
@@ -208,10 +208,10 @@ class Recorder:
         """
         self._changes.append(
             {
-                self._LINE_HEADER: line_no,
-                self._VARIABLE_HEADER: None,
-                self._ACCESS_HEADER: None,
-                self._STDOUT_HEADER: None,
+                self.LINE_HEADER: line_no,
+                self.VARIABLE_HEADER: None,
+                self.ACCESS_HEADER: None,
+                self.STDOUT_HEADER: None,
             }
         )
 
@@ -227,7 +227,7 @@ class Recorder:
         get the line number of the last record
         :return: a line number
         """
-        return self.get_last_record()[self._LINE_HEADER]
+        return self.get_last_record()[self.LINE_HEADER]
 
     def get_second_to_last_record(self) -> MutableMapping:
         """
@@ -244,7 +244,7 @@ class Recorder:
         get the line number of the second to last record
         :return: a line number
         """
-        return self.get_second_to_last_record()[self._LINE_HEADER]
+        return self.get_second_to_last_record()[self.LINE_HEADER]
 
     def get_last_variable_change(self) -> MutableMapping:
         """
@@ -252,20 +252,20 @@ class Recorder:
         :return: variable dict in the last record
         """
 
-        last_variable_change = self.get_last_record()[self._VARIABLE_HEADER]
+        last_variable_change = self.get_last_record()[self.VARIABLE_HEADER]
         if last_variable_change is None:
-            last_variable_change = self.get_last_record()[self._VARIABLE_HEADER] = {}
+            last_variable_change = self.get_last_record()[self.VARIABLE_HEADER] = {}
 
         return last_variable_change
 
     def get_second_to_last_variable_change(self) -> MutableMapping:
         """Get the second last dict in the record list"""
         previous_variable_change = self.get_second_to_last_record()[
-            self._VARIABLE_HEADER
+            self.VARIABLE_HEADER
         ]
         if previous_variable_change is None:
             previous_variable_change = self.get_second_to_last_record()[
-                self._VARIABLE_HEADER
+                self.VARIABLE_HEADER
             ] = {}
 
         return previous_variable_change
@@ -311,10 +311,10 @@ class Recorder:
         for key, value in variable_state.items():
             temp.append(
                 {
-                    self._PAIR_KEY_HEADER: self.process_variable_state(
+                    self.PAIR_KEY_HEADER: self.process_variable_state(
                         self._INNER_IDENTIFIER_STRING, key, copy(memory_trace)
                     ),
-                    self._PAIR_VALUE_HEADER: self.process_variable_state(
+                    self.PAIR_VALUE_HEADER: self.process_variable_state(
                         self._INNER_IDENTIFIER_STRING, value, copy(memory_trace)
                     ),
                 }
@@ -324,7 +324,7 @@ class Recorder:
     def custom_repr(
         self, variable_state: Any, variable_type: str, memory_trace: Set
     ) -> Any:
-        if variable_type == self._REFERENCE_TYPE_STRING:
+        if variable_type == self.REFERENCE_TYPE_STRING:
             # which should always be None
             repr_result = None
         elif variable_type in self._GRAPH_OBJECT_TYPES:
@@ -382,27 +382,27 @@ class Recorder:
 
         if var_id in memory_trace:
             # leave a note on the object and then trace back
-            variable_type: str = self._REFERENCE_TYPE_STRING
+            variable_type: str = self.REFERENCE_TYPE_STRING
         else:
             variable_type: str = self._search_type_string(variable_state)
             memory_trace.add(var_id)
 
         state_mapping: MutableMapping = {
-            self._TYPE_HEADER: variable_type,
-            self._PYTHON_ID_HEADER: var_id,
-            self._COLOR_HEADER: self._color_mapping[var_ident_str],
+            self.TYPE_HEADER: variable_type,
+            self.PYTHON_ID_HEADER: var_id,
+            self.COLOR_HEADER: self._color_mapping[var_ident_str],
         }
 
-        state_mapping[self._REPR_HEADER] = self.custom_repr(
-            variable_state, state_mapping[self._TYPE_HEADER], memory_trace
+        state_mapping[self.REPR_HEADER] = self.custom_repr(
+            variable_state, state_mapping[self.TYPE_HEADER], memory_trace
         )
 
-        if state_mapping[self._TYPE_HEADER] in self._GRAPH_OBJECT_TYPES:
+        if state_mapping[self.TYPE_HEADER] in self._GRAPH_OBJECT_TYPES:
             variable_state: Union[Node, Edge]
-            state_mapping[self._GRAPH_ID_HEADER] = get_cytoscape_id(
-                self._graph, variable_state, self._GRAPH_ID_HEADER
+            state_mapping[self.GRAPH_ID_HEADER] = get_cytoscape_id(
+                self._graph, variable_state, self.GRAPH_ID_HEADER
             )
-            state_mapping[self._GRAPH_PROPERTY_HEADER] = deepcopy(
+            state_mapping[self.GRAPH_PROPERTY_HEADER] = deepcopy(
                 self._graph.nodes.get(variable_state, {})
             )
 
@@ -430,7 +430,7 @@ class Recorder:
         add last current output into record
         :return: None
         """
-        self.get_second_to_last_record()[self._STDOUT_HEADER] = self.read_from_io()
+        self.get_second_to_last_record()[self.STDOUT_HEADER] = self.read_from_io()
 
     def add_variable_change_to_last_record(
         self, var_ident_str: str, variable_state: Any
@@ -480,13 +480,13 @@ class Recorder:
         :return: an init record
         """
         return {
-            self._LINE_HEADER: 0,
-            self._VARIABLE_HEADER: (
+            self.LINE_HEADER: 0,
+            self.VARIABLE_HEADER: (
                 {
                     key: {
-                        self._TYPE_HEADER: self._INIT_TYPE_STRING,
-                        self._COLOR_HEADER: value,
-                        self._REPR_HEADER: None,
+                        self.TYPE_HEADER: self.INIT_TYPE_STRING,
+                        self.COLOR_HEADER: value,
+                        self.REPR_HEADER: None,
                     }
                     for key, value in self._color_mapping.items()
                     if not (
@@ -497,8 +497,8 @@ class Recorder:
             )
             if len(self._color_mapping) > len(self._DEFAULT_COLOR_MAPPING)
             else None,
-            self._ACCESS_HEADER: None,
-            self._STDOUT_HEADER: None,
+            self.ACCESS_HEADER: None,
+            self.STDOUT_HEADER: None,
         }
 
     def _process_change_list(self) -> List[MutableMapping]:
@@ -507,20 +507,20 @@ class Recorder:
 
             temp_container = [init_object]
 
-            previous_variables = init_object[self._VARIABLE_HEADER]
+            previous_variables = init_object[self.VARIABLE_HEADER]
 
             for change in self._changes:
-                variables_field = change[self._VARIABLE_HEADER]
+                variables_field = change[self.VARIABLE_HEADER]
 
                 temp_object = {**change}
 
                 if variables_field is None:
-                    temp_object[self._VARIABLE_HEADER] = None
+                    temp_object[self.VARIABLE_HEADER] = None
                 else:
                     current_current_variables = deepcopy(previous_variables)
                     for changed_var_key, changed_var_value in variables_field.items():
                         current_current_variables[changed_var_key] = changed_var_value
-                    temp_object[self._VARIABLE_HEADER] = current_current_variables
+                    temp_object[self.VARIABLE_HEADER] = current_current_variables
                     previous_variables = current_current_variables
 
                 temp_container.append(temp_object)
