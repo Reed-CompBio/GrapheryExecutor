@@ -842,7 +842,9 @@ class GraphController(Controller[List[MutableMapping]]):
             from warnings import warn
 
             warn("initialization of recorder requires proper graph")
-        self._recorder = _recorder_cls(graph=self._graph, logger=self._logger)
+        self._recorder = _recorder_cls(
+            graph=self._graph, stdout=self._stdout, logger=self._logger
+        )
         self._logger.debug(f"made new recorder {self._recorder}")
 
     def _build_tracer(self) -> None:

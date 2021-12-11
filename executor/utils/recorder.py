@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import random
 from copy import copy, deepcopy
+from io import StringIO
 from logging import Logger
 from numbers import Number
 from typing import (
@@ -32,8 +33,12 @@ from networkx import (
     is_data_multi_edge,
     Graph,
 )
+from .cytoscape_helper import get_cytoscape_id
 from .logger import void_logger
 from ..settings import IDENTIFIER_SEPARATOR
+
+
+__all__ = ["Recorder"]
 
 
 def identifier_to_string(identifier: Sequence[str]) -> str:
@@ -51,6 +56,8 @@ def generate_hex() -> str:
 
 
 class Recorder:
+    """check out RFC for more detail"""
+
     _DEFAULT_COLOR_PALETTE = [
         "#828282",
         "#B15928",
@@ -138,12 +145,19 @@ class Recorder:
     _LINE_HEADER = "line"
     _VARIABLE_HEADER = "variables"
     _ACCESS_HEADER = "accesses"
+    _STDOUT_HEADER = "stdout"
     _PAIR_KEY_HEADER = "key"
     _PAIR_VALUE_HEADER = "value"
 
     _BAD_REPR_STRING = "BAD REPR FUNCTION"
 
-    def __init__(self, *, graph: Graph = None, logger: Logger = void_logger):
+    def __init__(
+        self,
+        *,
+        graph: Graph = None,
+        stdout: StringIO = None,
+        logger: Logger = void_logger,
+    ):
         self._changes: List[MutableMapping] = []
         self._final_changes: List[MutableMapping] | None = None
         self._color_mapping: MutableMapping = {**self._DEFAULT_COLOR_MAPPING}
@@ -151,6 +165,7 @@ class Recorder:
 
         # since node and edges don't carry data anymore
         self._graph = graph
+        self._stdout = stdout
 
     def assign_and_get_color(self, identifier_string: str) -> None:
         """
@@ -195,6 +210,7 @@ class Recorder:
                 self._LINE_HEADER: line_no,
                 self._VARIABLE_HEADER: None,
                 self._ACCESS_HEADER: None,
+                self._STDOUT_HEADER: None,
             }
         )
 
@@ -274,6 +290,7 @@ class Recorder:
     def _generate_singular_repr(self, variable_state: Any) -> str:
         return self._generate_repr(variable_state)
 
+    # ========== repr for different entities
     def _generate_linear_container_repr(
         self, variable_state: Sequence, memory_trace: Set
     ) -> List:
@@ -307,16 +324,8 @@ class Recorder:
         self, variable_state: Any, variable_type: str, memory_trace: Set
     ) -> Any:
         if variable_type == self._REFERENCE_TYPE_STRING:
-            var_real_type = self._search_type_string(variable_state)
-            repr_result = (
-                self._generate_repr(variable_state)
-                if (
-                    var_real_type in self._SINGULAR_TYPES
-                    or var_real_type == self._OBJECT_TYPE_STRING
-                )
-                else None
-            )
             # which should always be None
+            repr_result = None
         elif variable_type in self._GRAPH_OBJECT_TYPES:
             # TODO use custom graph repr generator
             repr_result = self._generate_singular_repr(variable_state)
@@ -338,7 +347,14 @@ class Recorder:
             repr_result = self._generate_repr(variable_state)
         return repr_result
 
+    # ==========  repr end
+
     def _search_type_string(self, variable_state: Any) -> str:
+        """
+        takes in an entity and returns the corresponding type label
+        :param variable_state:
+        :return:
+        """
         for type_validator, type_string in self._GRAPH_OBJECT_MAPPING.items():
             if type_validator(variable_state):
                 return type_string
@@ -348,8 +364,16 @@ class Recorder:
                 return type_string
 
     def process_variable_state(
-        self, identifier_string: str, variable_state: Any, memory_trace: Set = None
+        self, var_ident_str: str, variable_state: Any, memory_trace: Set = None
     ) -> MutableMapping:
+        """
+        takes in an identity label, the corresponding entity, and previous memory trace
+        returns
+        :param var_ident_str:
+        :param variable_state:
+        :param memory_trace:
+        :return:
+        """
         # TODO this is problematic
         if memory_trace is None:
             memory_trace = set()
@@ -365,7 +389,7 @@ class Recorder:
         state_mapping: MutableMapping = {
             self._TYPE_HEADER: variable_type,
             self._PYTHON_ID_HEADER: var_id,
-            self._COLOR_HEADER: self._color_mapping[identifier_string],
+            self._COLOR_HEADER: self._color_mapping[var_ident_str],
         }
 
         state_mapping[self._REPR_HEADER] = self.custom_repr(
@@ -374,44 +398,63 @@ class Recorder:
 
         if state_mapping[self._TYPE_HEADER] in self._GRAPH_OBJECT_TYPES:
             variable_state: Union[Node, Edge]
-
-            # TODO deal with id
-            state_mapping[self._GRAPH_ID_HEADER] = str(variable_state)
-            # TODO deal with properties
-            state_mapping[self._GRAPH_PROPERTY_HEADER] = {}
+            state_mapping[self._GRAPH_ID_HEADER] = get_cytoscape_id(
+                self._graph, variable_state, self._GRAPH_ID_HEADER
+            )
+            state_mapping[self._GRAPH_PROPERTY_HEADER] = deepcopy(
+                self._graph.nodes.get(variable_state, {})
+            )
 
         return state_mapping
 
+    def read_from_io(self) -> str | None:
+        """
+        read from given stdout stream
+        :return:
+        """
+        if not self._stdout:
+            return None
+        result = self._stdout.read()
+        self._stdout.truncate(0)
+        return result if result else None
+
+    def add_stdout_change_to_last_record(self) -> None:
+        """
+        add last current output into record
+        :return: None
+        """
+        self.get_last_record()[self._STDOUT_HEADER] = self.read_from_io()
+
     def add_variable_change_to_last_record(
-        self, variable_identifier_string: str, variable_state: Any
+        self, var_ident_str: str, variable_state: Any
     ) -> None:
         """
         add a variable change to the last record
-        @param variable_identifier_string: (name_space, variable_name)
+        @param var_ident_str: (name_space, variable_name)
         @param variable_state: the variable state
         @return: None
         """
         # if isinstance(variable_change, Tuple):
-        self.get_last_variable_change()[
-            variable_identifier_string
-        ] = self.process_variable_state(variable_identifier_string, variable_state)
+        self.get_last_variable_change()[var_ident_str] = self.process_variable_state(
+            var_ident_str, variable_state
+        )
 
     def add_variable_change_to_second_to_last_record(
-        self, variable_identifier_string: str, variable_state: Any
+        self, var_ident_str: str, variable_state: Any
     ) -> None:
         """Add variable change to previous (second last if possible) record.
 
         When the variable is created/changed in line a,
         the tracer evaluate it in line a+1. So, this function
         is created to deal with this offset
-        @param variable_identifier_string:
+        @param var_ident_str:
         @param variable_state:
         @return:
         """
         # if isinstance(variable_change, Tuple) and len(self.changes) > 1:
         self.get_second_to_last_variable_change()[
-            variable_identifier_string
-        ] = self.process_variable_state(variable_identifier_string, variable_state)
+            var_ident_str
+        ] = self.process_variable_state(var_ident_str, variable_state)
 
     def add_variable_access_to_last_record(self, access_change: Any) -> None:
         """
@@ -425,6 +468,10 @@ class Recorder:
 
     @property
     def _init_result_object(self) -> MutableMapping:
+        """
+        default init records that will be placed at the beginning of the record array
+        :return: an init record
+        """
         return {
             self._LINE_HEADER: 0,
             self._VARIABLE_HEADER: {
@@ -477,12 +524,10 @@ class Recorder:
     def change_list(self):
         return self._changes
 
-    def get_processed_change_list(self) -> List[MutableMapping]:
-        return self._process_change_list()
-
     @property
     def final_change_list(self):
         return self._process_change_list()
 
-    def get_change_list_json(self) -> str:
-        return json.dumps(self.get_processed_change_list())
+    @property
+    def final_change_list_json(self) -> str:
+        return json.dumps(self.final_change_list)
