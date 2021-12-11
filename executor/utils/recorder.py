@@ -166,6 +166,7 @@ class Recorder:
         # since node and edges don't carry data anymore
         self._graph = graph
         self._stdout = stdout
+        self._stdout_cache = []
 
     def assign_and_get_color(self, identifier_string: str) -> None:
         """
@@ -407,23 +408,29 @@ class Recorder:
 
         return state_mapping
 
-    def read_from_io(self) -> str | None:
+    def read_from_io(self) -> List[str] | None:
         """
         read from given stdout stream
         :return:
         """
         if not self._stdout:
             return None
-        result = self._stdout.read()
-        self._stdout.truncate(0)
-        return result if result else None
+        self._stdout.seek(0)
+        result = self._stdout.readlines()
+        if result != self._stdout_cache:
+            # egh, black handles slices poorly
+            # TODO how about performance?
+            diff = result[len(self._stdout_cache) :]
+            self._stdout_cache = result
+            return diff
+        return None
 
-    def add_stdout_change_to_last_record(self) -> None:
+    def add_stdout_change(self) -> None:
         """
         add last current output into record
         :return: None
         """
-        self.get_last_record()[self._STDOUT_HEADER] = self.read_from_io()
+        self.get_second_to_last_record()[self._STDOUT_HEADER] = self.read_from_io()
 
     def add_variable_change_to_last_record(
         self, var_ident_str: str, variable_state: Any
@@ -474,18 +481,22 @@ class Recorder:
         """
         return {
             self._LINE_HEADER: 0,
-            self._VARIABLE_HEADER: {
-                key: {
-                    self._TYPE_HEADER: self._INIT_TYPE_STRING,
-                    self._COLOR_HEADER: value,
-                    self._REPR_HEADER: None,
+            self._VARIABLE_HEADER: (
+                {
+                    key: {
+                        self._TYPE_HEADER: self._INIT_TYPE_STRING,
+                        self._COLOR_HEADER: value,
+                        self._REPR_HEADER: None,
+                    }
+                    for key, value in self._color_mapping.items()
+                    if not (
+                        key == self._INNER_IDENTIFIER_STRING
+                        or key == self._ACCESSED_IDENTIFIER_STRING
+                    )
                 }
-                for key, value in self._color_mapping.items()
-                if not (
-                    key == self._INNER_IDENTIFIER_STRING
-                    or key == self._ACCESSED_IDENTIFIER_STRING
-                )
-            },
+            )
+            if len(self._color_mapping) > len(self._DEFAULT_COLOR_MAPPING)
+            else None,
             self._ACCESS_HEADER: None,
         }
 
@@ -525,7 +536,7 @@ class Recorder:
         return self._changes
 
     @property
-    def final_change_list(self):
+    def final_change_list(self) -> List[Mapping]:
         return self._process_change_list()
 
     @property

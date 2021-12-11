@@ -912,3 +912,11 @@ class GraphController(Controller[List[MutableMapping]]):
 
     def format_result(self, result):
         return json.dumps(result)
+
+    @property
+    def recorder(self):
+        return self._recorder
+
+    @property
+    def tracer(self):
+        return self._tracer
