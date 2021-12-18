@@ -128,34 +128,52 @@ class TestRecorder:
         target.check(ctrl.recorder.final_change_list)
 
     def test_peek(self):
-        code = dedent(
-            """\
-            @tracer.peek
-            def compute(a, b, c):
-                a = a ** a
-                b = b * a - c
-                return a * b + c
-            
-            with tracer('j', 'k'):
-                i = compute(2, 3, 5)
-                j = compute(7, 9, 10) * compute(3, 2, -1)
-                k = 11 - 7
-            """
-        )
+        codes = [
+            dedent(
+                """\
+                @tracer.peek
+                def compute(a, b, c):
+                    a = a ** a
+                    b = b * a - c
+                    return a * b + c
+                
+                with tracer('j', 'k'):
+                    i = compute(2, 3, 5)
+                    j = compute(7, 9, 10) * compute(3, 2, -1)
+                    k = 11 - 7
+                """
+            ),
+            dedent(
+                """
+                @peek
+                def compute(a, b, c):
+                    a = a ** a
+                    b = b * a - c
+                    return a * b + c
+                
+                with tracer('j', 'k'):
+                    i = compute(2, 3, 5)
+                    j = compute(7, 9, 10) * compute(3, 2, -1)
+                    k = 11 - 7
+                """
+            ),
+        ]
 
-        ctrl = run_main(
-            self.controller,
-            code=code,
-            graph_data=self.default_graph_data,
-        )
+        for code in codes:
 
-        # fmt: off
-        target = RecorderEQ()\
-            .start_init()\
-            .add_record().add_access('i').back()\
-            .add_record().add_variable('', 'j').add_access(1).add_access(2).back()\
-            .add_record().add_variable('', 'j').add_variable('', 'k').back()\
-            .exit_with()
-        # fmt: on
+            ctrl = run_main(
+                self.controller,
+                code=code,
+                graph_data=self.default_graph_data,
+            )
 
-        target.check(ctrl.recorder.final_change_list)
+            # fmt: off
+            target = RecorderEQ()\
+                .start_init()\
+                .add_record().add_access('i').back()\
+                .add_record().add_variable('', 'j').add_access(1).add_access(2).back()\
+                .add_record().add_variable('', 'j').add_variable('', 'k').back()\
+                .exit_with()
+            # fmt: on
+
+            target.check(ctrl.recorder.final_change_list)
