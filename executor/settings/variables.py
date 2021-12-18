@@ -49,9 +49,18 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 # Shell Variables
 class VarClass(Protocol):
-    vars: ClassVar[Mapping[str, ...]]
+    __slots__ = []
+
+    _vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
+
+    _vars: Dict[str, ...]
+    v: _VarGetter
+
+    @property
+    def vars(self) -> Mapping[str, ...]:
+        raise NotImplementedError
 
     def __getitem__(self, item: str):
         ...
@@ -72,6 +81,8 @@ _T = TypeVar("_T", bound=VarClass)
 
 
 class _DefaultVarsFields(Protocol):
+    __slots__ = []
+
     SERVER_URL: ClassVar[str]
     SERVER_PORT: ClassVar[str]
     ALLOW_OTHER_ORIGIN: ClassVar[str]
@@ -91,19 +102,22 @@ class _DefaultVarsFields(Protocol):
 
 
 class _VarGetter(_DefaultVarsFields):
+    __slots__ = ["_storage"]
+
     def __init__(self, storage: VarClass) -> None:
         self._storage = storage
 
     def __getattr__(self, item):
         if item not in self._storage.vars:
-            print(self._storage.vars)
             raise AttributeError(
-                f"'{self.__class__.__name__}' object has no attribute '{item}'"
+                f"'{self._storage.__class__.__name__}' object has no attribute '{item}'"
             )
         return self._storage[item]
 
 
 class DefaultVars(_DefaultVarsFields, VarClass):
+    __slots__ = ["_vars", "v"]
+
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVER_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
@@ -121,7 +135,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
     REQUEST_DATA_OPTIONS_NAME = "REQUEST_DATA_OPTIONS_NAME"
 
-    vars = {
+    _default_vars = {
         SERVER_URL: "127.0.0.1",
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
@@ -144,7 +158,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         SERVER_URL: (
             ("-u", "--url"),
             {
-                "default": vars[SERVER_URL],
+                "default": _default_vars[SERVER_URL],
                 "type": str,
                 "help": "The url the local server will run on",
             },
@@ -152,19 +166,19 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         SERVER_PORT: (
             ("-p", "--port"),
             {
-                "default": vars[SERVER_PORT],
+                "default": _default_vars[SERVER_PORT],
                 "type": int,
                 "help": "The port the local server will run on",
             },
         ),
         ALLOW_OTHER_ORIGIN: (
             ("-a", "--allow-origin"),
-            {"default": vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
+            {"default": _default_vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
         ),
         ACCEPTED_ORIGINS: (
             ("-o", "--origin"),
             {
-                "default": vars[ACCEPTED_ORIGINS],
+                "default": _default_vars[ACCEPTED_ORIGINS],
                 "action": "extend",
                 "nargs": "+",
                 "type": str,
@@ -175,43 +189,43 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         EXEC_TIME_OUT: (
             ("-t", "--time-out"),
             {
-                "default": vars[EXEC_TIME_OUT],
+                "default": _default_vars[EXEC_TIME_OUT],
                 "type": int,
             },
         ),
         EXEC_MEM_OUT: (
             ("-m", "--mem-out"),
             {
-                "default": vars[EXEC_MEM_OUT],
+                "default": _default_vars[EXEC_MEM_OUT],
                 "type": int,
             },
         ),
         IS_LOCAL: (
             ("-i", "--is-local"),
-            {"default": vars[IS_LOCAL], "action": "store_true"},
+            {"default": _default_vars[IS_LOCAL], "action": "store_true"},
         ),
         RAND_SEED: (
             ("-r", "--rand-seed"),
             {
-                "default": str(vars[RAND_SEED]),
+                "default": str(_default_vars[RAND_SEED]),
                 "type": lambda x: None if x.strip() == "None" else int(x),
             },
         ),
         FLOAT_PRECISION: (
             ("-f", "--float-precision"),
             {
-                "default": vars[FLOAT_PRECISION],
+                "default": _default_vars[FLOAT_PRECISION],
                 "type": int,
             },
         ),
         TARGET_VERSION: (
             ("-v", "--target-version"),
-            {"default": vars[TARGET_VERSION], "type": str},
+            {"default": _default_vars[TARGET_VERSION], "type": str},
         ),
         LOGGER: (
             ("-l", "--logger"),
             {
-                "default": vars[LOGGER],
+                "default": _default_vars[LOGGER],
                 "choices": [*AVAILABLE_LOGGERS.values()],
                 "type": AVAILABLE_LOGGERS.get,
                 "metavar": f"{{{', '.join(AVAILABLE_LOGGERS.keys())}}}",
@@ -220,12 +234,12 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     }
 
     def __init__(self, **kwargs):
-        self.vars = {**self.vars, **kwargs}
+        self._vars: Dict = {**self._default_vars, **kwargs}
         self.read_from_env(all_args=True)
         self.v = _VarGetter(self)
 
     def __getitem__(self, item: str):
-        return self.vars[item]
+        return self._vars[item]
 
     @classmethod
     def make_shell_env_name(cls, name: str) -> str:
@@ -233,11 +247,11 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     def read_from_env(self, *args, all_args: bool = False) -> None:
         if all_args:
-            args = self.vars.keys()
+            args = self._vars.keys()
 
         for env_name in args:
             shell_env_name = self.make_shell_env_name(env_name)
-            original = self.vars[env_name]
+            original = self._vars[env_name]
             # type conversions from str to the proper type
             og_type = type(original)
             if og_type is list:
@@ -272,7 +286,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
             from_env = _getenv(shell_env_name, None)
             if from_env is not None:
-                self.vars[env_name] = og_type(from_env)
+                self._vars[env_name] = og_type(from_env)
 
     @classmethod
     def get_var_arg_name(cls, var_field: str) -> str:
@@ -307,4 +321,8 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     @classmethod
     def __class_getitem__(cls, item):
-        return cls.vars[item]
+        return cls._default_vars[item]
+
+    @property
+    def vars(self) -> Mapping[str, ...]:
+        return self._vars
