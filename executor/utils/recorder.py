@@ -58,6 +58,17 @@ def generate_hex() -> str:
 class Recorder:
     """check out RFC for more detail"""
 
+    __slots__ = [
+        "_changes",
+        "_final_changes",
+        "_color_mapping",
+        "_logger",
+        "_graph",
+        "_stdout",
+        "_stdout_cache",
+        "_float_precision",
+    ]
+
     _DEFAULT_COLOR_PALETTE = [
         "#828282",
         "#B15928",
