@@ -70,7 +70,6 @@ class TestArgparse:
                 (DefaultVars.RAND_SEED, "None", None),
                 (DefaultVars.RAND_SEED, "10", 10),
                 (DefaultVars.FLOAT_PRECISION, "5", 5),
-                (DefaultVars.TARGET_VERSION, "3.0.0", "3.0.0"),
                 (DefaultVars.LOGGER, "shell_debug", shell_debug_logger),
             )
         ],

@@ -831,6 +831,7 @@ class GraphController(Controller[List[MutableMapping]]):
         *,
         code: str,
         graph_data: dict | str,
+        target_version: str,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultVars(),
         options: Mapping = None,
@@ -847,7 +848,7 @@ class GraphController(Controller[List[MutableMapping]]):
         # collect basic data
         self._code = code
         self._graph_data = graph_data
-        self._target_version = default_settings.v.TARGET_VERSION
+        self._target_version = target_version
         self._graph: nx.Graph | None = None  # placeholder
 
         # collect recorder and tracer
@@ -911,7 +912,7 @@ class GraphController(Controller[List[MutableMapping]]):
     def _check_version(self) -> None:
         if self._target_version != SERVER_VERSION:
             raise ValueError(
-                f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
+                f"Request Version '{self._target_version}' does not match Server Version '{SERVER_VERSION}'"
             )
 
     @classmethod

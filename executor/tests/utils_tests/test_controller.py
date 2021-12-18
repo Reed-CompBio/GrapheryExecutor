@@ -13,12 +13,13 @@ from ...settings import DefaultVars, SERVER_VERSION
 from ...utils.controller import GraphController, ControllerResultAnnouncer
 
 _platform = platform()
-_versioned_settings = DefaultVars(**{DefaultVars.TARGET_VERSION: SERVER_VERSION})
+_settings = DefaultVars()
 
 
 def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
     ctrl = ctrl_cls(
-        default_settings=_versioned_settings,
+        target_version=SERVER_VERSION,
+        default_settings=_settings,
         **kwargs,
     ).init()
     # set is local when only running main
@@ -217,10 +218,9 @@ class TestGraphController:
         ctrl = self.controller(
             code=code,
             graph_data=graph_data,
+            target_version="wrong_ver",
             default_settings=not_versioned_settings,
         )
-        assert ctrl._target_version == not_versioned_settings.v.TARGET_VERSION
-
         with pytest.raises(SystemExit):
             ctrl.init()
 

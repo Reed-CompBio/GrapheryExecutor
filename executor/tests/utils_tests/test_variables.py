@@ -37,7 +37,7 @@ class TestVariables:
             (DefaultVars.RAND_SEED, "10", 10),
             (DefaultVars.RAND_SEED, "None", None),
             (DefaultVars.FLOAT_PRECISION, "8", 8),
-            (DefaultVars.TARGET_VERSION, "3.0.0", "3.0.0"),
+            (DefaultVars.REQUEST_DATA_VERSION_NAME, "3.0.0", "3.0.0"),
             (DefaultVars.REQUEST_DATA_CODE_NAME, "codes", "codes"),
             (DefaultVars.REQUEST_DATA_GRAPH_NAME, "graphs", "graphs"),
             (DefaultVars.REQUEST_DATA_OPTIONS_NAME, "option", "option"),

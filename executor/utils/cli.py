@@ -61,11 +61,13 @@ def _local_run(settings: DefaultVars) -> None:
     request_obj: Mapping = json.loads(input_content)
     code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
     graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+    target_version = request_obj[settings.v.REQUEST_DATA_VERSION_NAME]
     options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
 
     ctrl = GraphController(
         code=code,
         graph_data=graph,
+        target_version=target_version,
         default_settings=settings,
         options=options,
     ).init()

@@ -4,7 +4,7 @@ import json
 from logging import Logger
 from os import getenv as _getenv
 from types import NoneType
-from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final
+from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final, Sequence
 
 __all__ = [
     "VarClass",
@@ -49,7 +49,7 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 # Shell Variables
 class VarClass(Protocol):
-    __slots__ = ()
+    __slots__: Sequence = ()
 
     _vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
@@ -81,7 +81,7 @@ _T = TypeVar("_T", bound=VarClass)
 
 
 class _DefaultVarsFields(Protocol):
-    __slots__ = ()
+    __slots__: Sequence = ()
 
     SERVER_URL: ClassVar[str]
     SERVER_PORT: ClassVar[str]
@@ -93,11 +93,11 @@ class _DefaultVarsFields(Protocol):
     IS_LOCAL: ClassVar[str]
     RAND_SEED: ClassVar[str]
     FLOAT_PRECISION: ClassVar[str]
-    TARGET_VERSION: ClassVar[str]
     LOGGER: ClassVar[str]
 
     REQUEST_DATA_CODE_NAME: ClassVar[str]
     REQUEST_DATA_GRAPH_NAME: ClassVar[str]
+    REQUEST_DATA_VERSION_NAME: ClassVar[str]
     REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
 
 
@@ -128,11 +128,11 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     IS_LOCAL = "IS_LOCAL"
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
-    TARGET_VERSION = "TARGET_VERSION"
     LOGGER = "LOGGER"
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
+    REQUEST_DATA_VERSION_NAME = "REQUEST_DATA_VERSION_NAME"
     REQUEST_DATA_OPTIONS_NAME = "REQUEST_DATA_OPTIONS_NAME"
 
     _default_vars = {
@@ -147,10 +147,10 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
-        TARGET_VERSION: None,
         #
         REQUEST_DATA_CODE_NAME: "code",
         REQUEST_DATA_GRAPH_NAME: "graph",
+        REQUEST_DATA_VERSION_NAME: "version",
         REQUEST_DATA_OPTIONS_NAME: "options",
     }
 
@@ -217,10 +217,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
                 "default": _default_vars[FLOAT_PRECISION],
                 "type": int,
             },
-        ),
-        TARGET_VERSION: (
-            ("-v", "--target-version"),
-            {"default": _default_vars[TARGET_VERSION], "type": str},
         ),
         LOGGER: (
             ("-l", "--logger"),
@@ -301,8 +297,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     @classmethod
     def var_arg_has_value(cls, var_field: str) -> bool:
         if var_field == cls.LOGGER:
-            return False
-        if var_field == cls.TARGET_VERSION:
             return False
 
         if var_field in cls.server_shell_var:

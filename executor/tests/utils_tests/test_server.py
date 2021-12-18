@@ -308,8 +308,6 @@ class TestServer:
                     "0",
                     "-f",
                     "4",
-                    "-v",
-                    SERVER_VERSION,
                     "-l",
                     "shell_debug",
                     "local",
@@ -337,6 +335,7 @@ class TestServer:
                     {
                         "code": "@tracer('a', 'b')\ndef test(a, b, c):\n    a = a * c\n    b = b * c\n    c = c * c\n    return a + b * c\n\ntest(7, 9, 11)",
                         "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                        "version": SERVER_VERSION,
                     }
                 ).encode(),
                 None,
@@ -347,11 +346,25 @@ class TestServer:
                     {
                         "code": "@tracers('a', 'b')\ndef test(a, b, c):\n    a = a * c\n    b = b * c\n    c = c * c\n    return a + b * c\n\ntest(7, 9, 11)",
                         "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                        "version": SERVER_VERSION,
                     }
                 ).encode(),
                 {
                     "expected_exception": ExecutionError,
                     "match": r"Cannot unload execution subprocess result. Error might have occurred in the execution: .*",
+                },
+            ),
+            (
+                json.dumps(
+                    {
+                        "code": "@tracers('a', 'b')\ndef test(a, b, c):\n    a = a * c\n    b = b * c\n    c = c * c\n    return a + b * c\n\ntest(7, 9, 11)",
+                        "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                        "version": "wrong_ver",
+                    }
+                ).encode(),
+                {
+                    "expected_exception": ExecutionError,
+                    "match": fr"Cannot unload execution subprocess result. Error might have occurred in the execution: An error occurs with exit code 5. Error: Request Version 'wrong_ver' does not match Server Version '{SERVER_VERSION}'",
                 },
             ),
             (
