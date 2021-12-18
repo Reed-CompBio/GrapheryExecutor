@@ -49,7 +49,7 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 # Shell Variables
 class VarClass(Protocol):
-    __slots__ = []
+    __slots__ = ()
 
     _vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
@@ -81,7 +81,7 @@ _T = TypeVar("_T", bound=VarClass)
 
 
 class _DefaultVarsFields(Protocol):
-    __slots__ = []
+    __slots__ = ()
 
     SERVER_URL: ClassVar[str]
     SERVER_PORT: ClassVar[str]

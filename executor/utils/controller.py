@@ -107,6 +107,8 @@ def _builtins_iterator() -> Generator[tuple[str, Any], Any, None]:
 
 
 class LayerContext(contextlib.AbstractContextManager):
+    __slots__ = ["_ctrl"]
+
     def __init__(self, controller: Controller):
         self._ctrl = controller
 
@@ -126,6 +128,8 @@ class LayerContext(contextlib.AbstractContextManager):
 
 
 class _FDRedirectLayer(LayerContext):
+    __slots__ = ()
+
     def enter(self):
         self._ctrl.stdout_redirector.__enter__()
         # self._ctrl.stderr_redirector.__enter__()
@@ -138,6 +142,8 @@ class _FDRedirectLayer(LayerContext):
 
 
 class _ModuleRestrict(LayerContext):
+    __slots__ = ()
+
     def enter(self) -> None:
         if not self._ctrl.is_local:
             # The posix module is a built-in and has a ton of OS access
@@ -191,6 +197,8 @@ class _ModuleRestrict(LayerContext):
 
 
 class ControllerResultAnnouncer:
+    __slots__ = ["_out"]
+
     def __init__(self, output=_sys.stdout):
         self._out = output
 
@@ -216,6 +224,8 @@ class ControllerResultAnnouncer:
 
 
 class _ResourceRestrict(LayerContext):
+    __slots__ = ()
+
     def _cpu_time_out_helper(self, sig_num, __):
         self._ctrl.announcer.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
@@ -256,6 +266,8 @@ class _ResourceRestrict(LayerContext):
 
 
 class _RandomContext(LayerContext):
+    __slots__ = ()
+
     def enter(self) -> None:
         random.seed(self._ctrl.rand_seed)
         self._ctrl.logger.debug(f"set random seed to {self._ctrl.rand_seed}")
@@ -274,6 +286,31 @@ class Controller(Generic[_T]):
     """
     Controller class that controls the execution of some `runner` function
     """
+
+    __slots__ = [
+        "_BANNED_BUILTINS",
+        "_DEL_MODULES",
+        "_ALLOWED_STDLIB_MODULE_IMPORTS",
+        "_BUILTIN_IMPORT",
+        "_announcer",
+        "_stderr_redirector",
+        "_stdout_redirector",
+        "_stderr",
+        "_stdout",
+        "_float_precision",
+        "_rand_seed",
+        "_re_cpu_time",
+        "_re_mem_size",
+        "_user_globals",
+        "_custom_ns",
+        "_is_local",
+        "_in_context",
+        "_runner",
+        "_context_layers",
+        "_init_layers",
+        "_logger",
+        "_default_settings",
+    ]
 
     _DEFAULT_CONTEXT_LAYERS = [
         _RandomContext,
@@ -777,6 +814,15 @@ class GraphController(Controller[List[MutableMapping]]):
     """
     Graph controller for Graphery Executor
     """
+
+    __slots__ = [
+        "_code",
+        "_graph_data",
+        "_target_version",
+        "_graph",
+        "_recorder",
+        "_tracer",
+    ]
 
     _graph_builder = nx.cytoscape_graph
 
