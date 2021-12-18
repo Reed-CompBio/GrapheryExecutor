@@ -285,7 +285,7 @@ class Recorder:
     def _generate_repr(self, variable_state: Any) -> str:
         try:
             if isinstance(variable_state, float):
-                repr_result = f"{{:.{self._float_precision}f}}".format(variable_state)
+                repr_result = f"{variable_state:.{self._float_precision}f}"
             else:
                 repr_result = repr(variable_state)
         except Exception:
