@@ -46,6 +46,7 @@ from ..settings import (
     RUNNER_ERROR_CODE,
     CTRL_ERROR_CODE,
 )
+from ..settings.variables import GRAPH_INJECTION_NAME, NX_GRAPH_INJECTION_NAME
 
 try:
     import resource
@@ -490,7 +491,7 @@ class Controller(Generic[_T]):
         def _err_fn(*_, **__):
             raise Exception(
                 f"'{fn}' is not supported by Executor. \n"
-                f"If you're using a local instance, please try to turn on is_local_flag"
+                f"If you're using a local instance, please try to turn on is_local"
             )
 
         return _err_fn
@@ -519,7 +520,7 @@ class Controller(Generic[_T]):
                 "open() is not supported by Executor. \n"
                 "Instead use io.StringIO() to simulate a file. \n"
                 "Here is an example: https://goo.gl/uNvBGl \n"
-                "If you're using a local instance, please try to turn on is_local_flag"
+                "If you're using a local instance, please try to turn on is_local"
             )
 
         return _open
@@ -586,6 +587,7 @@ class Controller(Generic[_T]):
             raise ValueError("module should have at least a name")
         for alias in aliases:
             self._custom_ns[alias] = module
+        self._logger.debug(f"added module {module} under the name(s) {aliases}")
 
     # ===== custom modules end =====
 
@@ -927,7 +929,9 @@ class GraphController(Controller[List[MutableMapping]]):
         )
 
     def _collect_globals(self) -> None:
+        setattr(nx, NX_GRAPH_INJECTION_NAME, self._graph)
         self._add_custom_module(nx, "nx", "networkx")
+        self._logger.debug("injected networkx")
 
         # place trace
         self._update_globals("tracer", self._tracer)
@@ -936,8 +940,9 @@ class GraphController(Controller[List[MutableMapping]]):
         self._update_globals("peek", self._tracer.peek)
         self._logger.debug("collects `peek` helper")
 
-        self._update_globals("graph", self._graph)
-        self._logger.debug(f"updated graph in user globals with {self._graph}")
+        self._update_globals(GRAPH_INJECTION_NAME, self._graph)
+        self._update_globals(NX_GRAPH_INJECTION_NAME, self._graph)
+        self._logger.debug("injected graphs")
 
         super(GraphController, self)._collect_globals()
 

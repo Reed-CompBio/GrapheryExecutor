@@ -10,6 +10,7 @@ import pytest
 from platform import platform
 
 from ...settings import DefaultVars, SERVER_VERSION
+from ...settings.variables import NX_GRAPH_INJECTION_NAME, GRAPH_INJECTION_NAME
 from ...utils.controller import GraphController, ControllerResultAnnouncer
 
 _platform = platform()
@@ -278,3 +279,31 @@ class TestGraphController:
         with redirect_stdout(stream):
             ctrl.main(formats=True, announces=True)
         assert stream.getvalue() == format_val
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            dedent(
+                f"""\
+                g = globals()
+                {ass}
+                """
+            )
+            for ass in [
+                "assert 'nx' in g, f'nx not in globals, {g}'",
+                "assert 'networkx' in g, f'networkx not in globals, {g}'",
+                f"assert hasattr(nx, '{NX_GRAPH_INJECTION_NAME}'), f'{NX_GRAPH_INJECTION_NAME} not in networkx'",
+                f"assert '{NX_GRAPH_INJECTION_NAME}' in g, f'{NX_GRAPH_INJECTION_NAME} not in g'",
+                f"assert '{GRAPH_INJECTION_NAME}' in g, f'{GRAPH_INJECTION_NAME} not in g'",
+            ]
+        ],
+    )
+    def test_injection(self, code):
+        graph_data = {}
+        ctrl = make_test_controller_instance(
+            self.controller,
+            code=code,
+            graph_data=graph_data,
+            **{DefaultVars.IS_LOCAL: True},
+        )
+        ctrl.main()

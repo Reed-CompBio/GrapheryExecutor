@@ -46,6 +46,9 @@ SHELL_PARSER_GROUP_NAME: Final[str] = "WHERE"
 SHELL_SERVER_PARSER_NAME: Final[str] = "server"
 SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
+GRAPH_INJECTION_NAME = "graph"
+NX_GRAPH_INJECTION_NAME = "g_graph"
+
 
 # Shell Variables
 class VarClass(Protocol):
