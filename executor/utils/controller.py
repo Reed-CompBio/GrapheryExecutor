@@ -45,8 +45,9 @@ from ..settings import (
     PREP_ERROR_CODE,
     RUNNER_ERROR_CODE,
     CTRL_ERROR_CODE,
+    GRAPH_INJECTION_NAME,
+    NX_GRAPH_INJECTION_NAME,
 )
-from ..settings.variables import GRAPH_INJECTION_NAME, NX_GRAPH_INJECTION_NAME
 
 try:
     import resource
@@ -298,7 +299,6 @@ class Controller(Generic[_T]):
         "_stdout_redirector",
         "_stderr",
         "_stdout",
-        "_float_precision",
         "_rand_seed",
         "_re_cpu_time",
         "_re_mem_size",
@@ -311,6 +311,7 @@ class Controller(Generic[_T]):
         "_init_layers",
         "_logger",
         "_default_settings",
+        "_options",
     ]
 
     _DEFAULT_CONTEXT_LAYERS = [
@@ -342,12 +343,12 @@ class Controller(Generic[_T]):
         :param stderr:
         :param kwargs:
         """
-        options = {**default_settings.vars, **(options or {}), **kwargs}
+        self._options = {**default_settings.vars, **(options or {}), **kwargs}
         self._default_settings = default_settings
 
         # register logger
-        self._logger: Logger = options.get(
-            "logger", options.get(default_settings.LOGGER)
+        self._logger: Logger = self._options.get(
+            "logger", self._options.get(default_settings.LOGGER)
         )
 
         # register control layers
@@ -368,39 +369,36 @@ class Controller(Generic[_T]):
         self._in_context: bool = False
 
         # local flag
-        self._is_local: bool = options.get(default_settings.IS_LOCAL)
+        self._is_local: bool = self._options.get(default_settings.IS_LOCAL)
 
-        self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
+        self._custom_ns: Dict[str, types.ModuleType] = self._options.get(
+            "custom_ns", {}
+        )
 
         # sandbox
         self._user_globals: Dict[str, Any] = {}
 
         self._logger.debug(f"controller uses settings {default_settings}")
 
-        self._re_mem_size = options.get(default_settings.EXEC_MEM_OUT,) * int(
+        self._re_mem_size = self._options.get(default_settings.EXEC_MEM_OUT,) * int(
             10e6
         )  # convert mb to bytes
         self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
 
-        self._re_cpu_time = options.get(default_settings.EXEC_TIME_OUT)
+        self._re_cpu_time = self._options.get(default_settings.EXEC_TIME_OUT)
         self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
-        self._rand_seed = options.get(default_settings.RAND_SEED)
+        self._rand_seed = self._options.get(default_settings.RAND_SEED)
         self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
 
-        self._float_precision = options.get(default_settings.FLOAT_PRECISION)
-        self._logger.debug(
-            f"float precision will be {self._float_precision} in execution"
-        )
-
         # std
-        self._stdout = options.get("stdout", StringIO())
-        self._stderr = options.get("stderr", StringIO())
+        self._stdout = self._options.get("stdout", StringIO())
+        self._stderr = self._options.get("stderr", StringIO())
         self._stdout_redirector = redirect_stdout(self._stdout)
         self._stderr_redirector = redirect_stderr(self._stderr)
 
         # formatter
-        self._announcer = options.get("announcer", ControllerResultAnnouncer())
+        self._announcer = self._options.get("announcer", ControllerResultAnnouncer())
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -822,6 +820,7 @@ class GraphController(Controller[List[MutableMapping]]):
         "_graph_data",
         "_target_version",
         "_graph",
+        "_float_precision",
         "_recorder",
         "_tracer",
     ]
@@ -852,6 +851,11 @@ class GraphController(Controller[List[MutableMapping]]):
         self._graph_data = graph_data
         self._target_version = target_version
         self._graph: nx.Graph | None = None  # placeholder
+
+        self._float_precision = self._options.get(default_settings.FLOAT_PRECISION)
+        self._logger.debug(
+            f"float precision will be {self._float_precision} in execution"
+        )
 
         # collect recorder and tracer
         self._recorder: _recorder_cls | None = None  # placeholder

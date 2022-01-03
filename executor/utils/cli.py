@@ -60,9 +60,13 @@ def _local_run(settings: DefaultVars) -> None:
 
     request_obj: Mapping = json.loads(input_content)
     code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
+    logger.debug(f"parsed code {code}")
     graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+    logger.debug(f"parsed graph {graph}")
     target_version = request_obj[settings.v.REQUEST_DATA_VERSION_NAME]
+    logger.debug(f"parsed version {target_version}")
     options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+    logger.debug(f"parsed options {options}")
 
     ctrl = GraphController(
         code=code,
