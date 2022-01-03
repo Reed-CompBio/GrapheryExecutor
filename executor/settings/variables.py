@@ -33,6 +33,8 @@ _ENV_PREFIX: Final[str] = "GE_"
 PROG_NAME: Final[str] = "graphery_executor"
 SERVER_VERSION: Final[str] = "3.0.0"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
+GRAPH_INJECTION_NAME = "graph"
+NX_GRAPH_INJECTION_NAME = "g_graph"
 
 CTRL_ERROR_CODE: Final[int] = 3
 INIT_ERROR_CODE: Final[int] = 5
@@ -45,9 +47,6 @@ MEM_OUT_EXIT_CODE: Final[int] = 19
 SHELL_PARSER_GROUP_NAME: Final[str] = "WHERE"
 SHELL_SERVER_PARSER_NAME: Final[str] = "server"
 SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
-
-GRAPH_INJECTION_NAME = "graph"
-NX_GRAPH_INJECTION_NAME = "g_graph"
 
 
 # Shell Variables
