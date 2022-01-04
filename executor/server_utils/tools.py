@@ -63,16 +63,16 @@ class ServerResultFormatter:
         return error_msg
 
     def add_info(self, **kwargs) -> Dict:
-        info_msg = {**kwargs}
+        info_msg = kwargs
         if self._info is None:
-            self._info = []
+            self._info = {}
 
         if not self._info_msg_valid(info_msg):
             raise ValueError("value message malformed")
 
         self._logger.info("added info: \n" f"{info_msg}")
 
-        self._info.append(info_msg)
+        self._info.update(info_msg)
         return info_msg
 
     def _error_msg_valid(self, error_msg: Dict) -> bool:
@@ -88,7 +88,6 @@ class ServerResultFormatter:
     def _info_msg_valid(self, info_msg: Dict) -> bool:
         try:
             assert isinstance(info_msg, Dict)
-            assert "data" in info_msg
         except AssertionError:
             return False
         else:

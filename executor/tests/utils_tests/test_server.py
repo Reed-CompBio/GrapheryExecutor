@@ -159,9 +159,8 @@ class TestServer:
 
         assert (errors := res_obj["errors"]) is None, f"errors happened: {errors}"
         assert (info := res_obj["info"]) is not None, "info shouldn't be None"
-        info_obj = info[0]
         assert (
-            info_msg := info_obj["data"]
+            info_msg := info["result"]
         ) is not None, "error message shouldn't be None"
         assert (
             info_msg == target_info

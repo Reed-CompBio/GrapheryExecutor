@@ -67,7 +67,7 @@ class ExecutorWSGIServer(WSGIServer):
             )
         else:
             try:
-                formatter.add_info(data=self.application_helper(environ))
+                formatter.add_info(result=self.application_helper(environ))
             except ExecutionError as e:
                 formatter.add_error(
                     message=f"Something wrong happens in you're code. Details: {e}",
