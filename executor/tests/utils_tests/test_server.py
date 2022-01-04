@@ -14,6 +14,7 @@ from executor import SERVER_VERSION
 from executor.server_utils.main_functions import ExecutorWSGIServer
 from executor.server_utils.tools import ExecutionError, ArgumentError, ServerError
 from executor.settings import DefaultVars
+from executor.utils.recorder import Recorder
 
 
 class _ResponseObj:
@@ -388,6 +389,64 @@ class TestServer:
                 server.execute(config_bytes)
         else:
             server.execute(config_bytes)
+
+    def test_float_precision_option_passing(self):
+        server = ExecutorWSGIServer(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=self.default_settings,
+            bind_and_activate=self.bind,
+        )
+
+        precision = 8
+
+        data = json.dumps(
+            {
+                "code": "@tracer('a')\ndef test():\n    a = 1/3\ntest()",
+                "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                "version": SERVER_VERSION,
+                "options": {"float_precision": precision},
+            }
+        ).encode()
+
+        result = server.execute(data)
+        assert (
+            result[2][Recorder.VARIABLE_HEADER]["test\u200b@a"]["repr"]
+            == f"0.{'3' * precision}"
+        )
+
+    def test_random_option_passing(self):
+        server = ExecutorWSGIServer(
+            server_address=self.addr,
+            handler_cls=self.handler,
+            settings=self.default_settings,
+            bind_and_activate=self.bind,
+        )
+
+        rand_seed = 7
+        result_precision = 20
+
+        from random import Random
+
+        _r = Random(rand_seed)
+
+        data = json.dumps(
+            {
+                "code": "import random\n@tracer('a')\ndef test():\n    a = random.random()\ntest()",
+                "graph": '{"data":[],"directed":false,"multigraph":false,"elements":{"nodes":[{"data":{"id":"1","value":1,"name":"1"}},{"data":{"id":"2","value":2,"name":"2"}},{"data":{"id":"3","value":3,"name":"3"}},{"data":{"id":"4","value":4,"name":"4"}},{"data":{"id":"7","value":7,"name":"7"}},{"data":{"id":"5","value":5,"name":"5"}},{"data":{"id":"6","value":6,"name":"6"}}],"edges":[{"data":{"source":1,"target":2}},{"data":{"source":1,"target":3}},{"data":{"source":3,"target":4}},{"data":{"source":4,"target":5}},{"data":{"source":7,"target":5}},{"data":{"source":5,"target":5}}]}}',
+                "version": SERVER_VERSION,
+                "options": {
+                    "rand_seed": rand_seed,
+                    "float_precision": result_precision,
+                },
+            }
+        ).encode()
+
+        result = server.execute(data)
+        assert (
+            result[2][Recorder.VARIABLE_HEADER]["test\u200b@a"]["repr"]
+            == f"{_r.random():.{result_precision}f}"
+        )
 
 
 class TestResultFormatter:
