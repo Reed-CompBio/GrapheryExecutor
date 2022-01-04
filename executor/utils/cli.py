@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Mapping, Union, Sequence, Type
+from typing import Mapping, Union, Sequence, Type, Any, Dict
 
 from executor.server_utils.main_functions import run_server
 from executor.settings import (
@@ -59,14 +59,21 @@ def _local_run(settings: DefaultVars) -> None:
     logger.debug("got input content from stdin: " f"{input_content}")
 
     request_obj: Mapping = json.loads(input_content)
-    code = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
+
+    code: str = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
     logger.debug(f"parsed code {code}")
-    graph = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
+
+    graph: Dict = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
     logger.debug(f"parsed graph {graph}")
-    target_version = request_obj[settings.v.REQUEST_DATA_VERSION_NAME]
+
+    target_version: str = request_obj[settings.v.REQUEST_DATA_VERSION_NAME]
     logger.debug(f"parsed version {target_version}")
-    options = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+
+    options: Dict[str, Any] = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
     logger.debug(f"parsed options {options}")
+
+    options = {k.upper(): v for k, v in options.items()}
+    logger.debug(f"capitalized options {options}")
 
     ctrl = GraphController(
         code=code,

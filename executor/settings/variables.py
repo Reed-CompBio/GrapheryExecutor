@@ -16,6 +16,7 @@ __all__ = [
     "GRAPH_INJECTION_NAME",
     "NX_GRAPH_INJECTION_NAME",
     "ErrorCode",
+    "ControllerOptionNames",
     "SHELL_PARSER_GROUP_NAME",
     "SHELL_SERVER_PARSER_NAME",
     "SHELL_LOCAL_PARSER_NAME",
@@ -82,6 +83,14 @@ class VarClass(Protocol):
 _T = TypeVar("_T", bound=VarClass)
 
 
+class ControllerOptionNames:
+    LOGGER: Final[str] = "logger"
+    CUSTOM_NAMESPACE: Final[str] = "custom_ns"
+    STDOUT: Final[str] = "stdout"
+    STDERR: Final[str] = "stderr"
+    ANNOUNCER: Final[str] = "announcer"
+
+
 class _DefaultVarsFields(Protocol):
     __slots__: Sequence = ()
 
@@ -101,7 +110,6 @@ class _DefaultVarsFields(Protocol):
     REQUEST_DATA_GRAPH_NAME: ClassVar[str]
     REQUEST_DATA_VERSION_NAME: ClassVar[str]
     REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
-    REQUEST_OPTION_NAMES: ClassVar[Dict[str, str]]
 
 
 class _VarGetter(_DefaultVarsFields):

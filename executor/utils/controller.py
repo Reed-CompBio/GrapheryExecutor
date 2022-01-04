@@ -41,6 +41,7 @@ from ..settings import (
     GRAPH_INJECTION_NAME,
     NX_GRAPH_INJECTION_NAME,
     ErrorCode,
+    ControllerOptionNames,
 )
 
 try:
@@ -345,7 +346,7 @@ class Controller(Generic[_T]):
 
         # register logger
         self._logger: Logger = self._options.get(
-            "logger", self._options.get(default_settings.LOGGER)
+            ControllerOptionNames.LOGGER, self._options.get(default_settings.LOGGER)
         )
 
         # register control layers
@@ -369,7 +370,7 @@ class Controller(Generic[_T]):
         self._is_local: bool = self._options.get(default_settings.IS_LOCAL)
 
         self._custom_ns: Dict[str, types.ModuleType] = self._options.get(
-            "custom_ns", {}
+            ControllerOptionNames.CUSTOM_NAMESPACE, {}
         )
 
         # sandbox
@@ -389,13 +390,15 @@ class Controller(Generic[_T]):
         self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
 
         # std
-        self._stdout = self._options.get("stdout", StringIO())
-        self._stderr = self._options.get("stderr", StringIO())
+        self._stdout = self._options.get(ControllerOptionNames.STDOUT, StringIO())
+        self._stderr = self._options.get(ControllerOptionNames.STDERR, StringIO())
         self._stdout_redirector = redirect_stdout(self._stdout)
         self._stderr_redirector = redirect_stderr(self._stderr)
 
         # formatter
-        self._announcer = self._options.get("announcer", ControllerResultAnnouncer())
+        self._announcer = self._options.get(
+            ControllerOptionNames.ANNOUNCER, ControllerResultAnnouncer()
+        )
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -830,7 +833,7 @@ class GraphController(Controller[List[MutableMapping]]):
         self,
         *,
         code: str,
-        graph_data: dict | str,
+        graph_data: Dict | str,
         target_version: str,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultVars(),

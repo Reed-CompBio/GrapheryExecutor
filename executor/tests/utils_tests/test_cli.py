@@ -43,7 +43,7 @@ class TestArgparse:
         ],
     )
     def test_server_args(self, server_setting: str, var: Any, expected: Any):
-        # ehhhh, ugly
+        # ehh, ugly
         args = [SHELL_SERVER_PARSER_NAME]
         arg_name = self.settings.get_var_arg_name(server_setting)
 
