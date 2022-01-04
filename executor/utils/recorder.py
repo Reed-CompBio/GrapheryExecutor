@@ -288,10 +288,10 @@ class Recorder:
         get the access list from the last record
         :return: access list in the last record
         """
-        if self.get_last_record()["accesses"] is None:
-            self.get_last_record()["accesses"] = []
+        if self.get_last_record()[self.ACCESS_HEADER] is None:
+            self.get_last_record()[self.ACCESS_HEADER] = []
 
-        return self.get_last_record()["accesses"]
+        return self.get_last_record()[self.ACCESS_HEADER]
 
     def _generate_repr(self, variable_state: Any) -> str:
         try:
