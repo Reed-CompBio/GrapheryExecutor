@@ -37,16 +37,10 @@ import networkx as nx
 
 from ..settings import (
     DefaultVars,
-    INIT_ERROR_CODE,
-    CPU_OUT_EXIT_CODE,
-    MEM_OUT_EXIT_CODE,
     SERVER_VERSION,
-    POST_ERROR_CODE,
-    PREP_ERROR_CODE,
-    RUNNER_ERROR_CODE,
-    CTRL_ERROR_CODE,
     GRAPH_INJECTION_NAME,
     NX_GRAPH_INJECTION_NAME,
+    ErrorCode,
 )
 
 try:
@@ -208,12 +202,15 @@ class ControllerResultAnnouncer:
         self._out.write(s)
 
     def show_error(
-        self, exception: Exception, trace: str = None, error_code: int = 1
+        self,
+        exception: Exception,
+        trace: str = None,
+        error_code: ErrorCode = ErrorCode.CTRL_ERROR_CODE,
     ) -> NoReturn:
         from traceback import format_exc
 
         e = SystemExit(
-            f"An error occurs with exit code {error_code}. Error: {exception}\n"
+            f"An error occurs with exit code {error_code.value} ({error_code.name}). Error: {exception}\n"
             f"trace: \n"
             f"{trace if trace else format_exc()}"
         )
@@ -231,13 +228,13 @@ class _ResourceRestrict(LayerContext):
     def _cpu_time_out_helper(self, sig_num, __):
         self._ctrl.announcer.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
-            error_code=CPU_OUT_EXIT_CODE,
+            error_code=ErrorCode.CPU_OUT_EXIT_CODE,
         )
 
     def _mem_consumed_helper(self, sig_num, __):
         self._ctrl.announcer.show_error(
             ValueError(f"Allocated MEM size exhausted. Signal num: {sig_num}"),
-            error_code=MEM_OUT_EXIT_CODE,
+            error_code=ErrorCode.MEM_OUT_EXIT_CODE,
         )
 
     def enter(self) -> None:
@@ -664,7 +661,7 @@ class Controller(Generic[_T]):
         try:
             self._init_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=INIT_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.INIT_ERROR_CODE)
 
         return self
 
@@ -677,7 +674,7 @@ class Controller(Generic[_T]):
         try:
             self._prep_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=PREP_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -692,7 +689,7 @@ class Controller(Generic[_T]):
         try:
             self._post_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=POST_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.POST_ERROR_CODE)
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T:
         """
@@ -712,7 +709,9 @@ class Controller(Generic[_T]):
 
             self._logger.debug("exception occurs in runner execution")
             self._announcer.show_error(
-                RunnerError(e), trace=format_exc(), error_code=RUNNER_ERROR_CODE
+                RunnerError(e),
+                trace=format_exc(),
+                error_code=ErrorCode.RUNNER_ERROR_CODE,
             )
             return
 
@@ -760,7 +759,7 @@ class Controller(Generic[_T]):
             try:
                 result = self.format_result(result)
             except Exception as e:
-                self._announcer.show_error(e, error_code=CTRL_ERROR_CODE)
+                self._announcer.show_error(e, error_code=ErrorCode.CTRL_ERROR_CODE)
 
         if announces:
             self._logger.debug("announcing result from main")

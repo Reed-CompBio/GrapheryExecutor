@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import json
 from logging import Logger
 from os import getenv as _getenv
@@ -14,13 +15,7 @@ __all__ = [
     "IDENTIFIER_SEPARATOR",
     "GRAPH_INJECTION_NAME",
     "NX_GRAPH_INJECTION_NAME",
-    "CTRL_ERROR_CODE",
-    "INIT_ERROR_CODE",
-    "PREP_ERROR_CODE",
-    "POST_ERROR_CODE",
-    "RUNNER_ERROR_CODE",
-    "CPU_OUT_EXIT_CODE",
-    "MEM_OUT_EXIT_CODE",
+    "ErrorCode",
     "SHELL_PARSER_GROUP_NAME",
     "SHELL_SERVER_PARSER_NAME",
     "SHELL_LOCAL_PARSER_NAME",
@@ -38,13 +33,16 @@ IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 GRAPH_INJECTION_NAME = "graph"
 NX_GRAPH_INJECTION_NAME = "g_graph"
 
-CTRL_ERROR_CODE: Final[int] = 3
-INIT_ERROR_CODE: Final[int] = 5
-PREP_ERROR_CODE: Final[int] = 7
-POST_ERROR_CODE: Final[int] = 11
-RUNNER_ERROR_CODE: Final[int] = 13
-CPU_OUT_EXIT_CODE: Final[int] = 17
-MEM_OUT_EXIT_CODE: Final[int] = 19
+
+class ErrorCode(enum.Enum):
+    CTRL_ERROR_CODE: Final[int] = 3
+    INIT_ERROR_CODE: Final[int] = 5
+    PREP_ERROR_CODE: Final[int] = 7
+    POST_ERROR_CODE: Final[int] = 11
+    RUNNER_ERROR_CODE: Final[int] = 13
+    CPU_OUT_EXIT_CODE: Final[int] = 17
+    MEM_OUT_EXIT_CODE: Final[int] = 19
+
 
 SHELL_PARSER_GROUP_NAME: Final[str] = "WHERE"
 SHELL_SERVER_PARSER_NAME: Final[str] = "server"
@@ -103,6 +101,7 @@ class _DefaultVarsFields(Protocol):
     REQUEST_DATA_GRAPH_NAME: ClassVar[str]
     REQUEST_DATA_VERSION_NAME: ClassVar[str]
     REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
+    REQUEST_OPTION_NAMES: ClassVar[Dict[str, str]]
 
 
 class _VarGetter(_DefaultVarsFields):

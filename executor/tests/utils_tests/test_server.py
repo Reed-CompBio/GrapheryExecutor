@@ -364,7 +364,7 @@ class TestServer:
                 ).encode(),
                 {
                     "expected_exception": ExecutionError,
-                    "match": fr"Cannot unload execution subprocess result. Error might have occurred in the execution: An error occurs with exit code 5. Error: Request Version 'wrong_ver' does not match Server Version '{SERVER_VERSION}'",
+                    "match": fr"Cannot unload execution subprocess result\. Error might have occurred in the execution: An error occurs with exit code 5 \(INIT_ERROR_CODE\)\. Error: Request Version 'wrong_ver' does not match Server Version '{SERVER_VERSION}'",
                 },
             ),
             (
