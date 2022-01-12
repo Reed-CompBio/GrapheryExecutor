@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import enum
 import json
 from logging import Logger
 from os import getenv as _getenv
 from types import NoneType
-from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final
+from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final, Sequence
 
 __all__ = [
     "VarClass",
@@ -12,13 +13,10 @@ __all__ = [
     "PROG_NAME",
     "SERVER_VERSION",
     "IDENTIFIER_SEPARATOR",
-    "CTRL_ERROR_CODE",
-    "INIT_ERROR_CODE",
-    "PREP_ERROR_CODE",
-    "POST_ERROR_CODE",
-    "RUNNER_ERROR_CODE",
-    "CPU_OUT_EXIT_CODE",
-    "MEM_OUT_EXIT_CODE",
+    "GRAPH_INJECTION_NAME",
+    "NX_GRAPH_INJECTION_NAME",
+    "ErrorCode",
+    "ControllerOptionNames",
     "SHELL_PARSER_GROUP_NAME",
     "SHELL_SERVER_PARSER_NAME",
     "SHELL_LOCAL_PARSER_NAME",
@@ -31,16 +29,21 @@ _ENV_PREFIX: Final[str] = "GE_"
 
 # Custom Variables
 PROG_NAME: Final[str] = "graphery_executor"
-SERVER_VERSION: Final[str] = "3.0.0"
+SERVER_VERSION: Final[str] = "3.1.0"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
+GRAPH_INJECTION_NAME = "graph"
+NX_GRAPH_INJECTION_NAME = "g_graph"
 
-CTRL_ERROR_CODE: Final[int] = 3
-INIT_ERROR_CODE: Final[int] = 5
-PREP_ERROR_CODE: Final[int] = 7
-POST_ERROR_CODE: Final[int] = 11
-RUNNER_ERROR_CODE: Final[int] = 13
-CPU_OUT_EXIT_CODE: Final[int] = 17
-MEM_OUT_EXIT_CODE: Final[int] = 19
+
+class ErrorCode(enum.Enum):
+    CTRL_ERROR_CODE: Final[int] = 3
+    INIT_ERROR_CODE: Final[int] = 5
+    PREP_ERROR_CODE: Final[int] = 7
+    POST_ERROR_CODE: Final[int] = 11
+    RUNNER_ERROR_CODE: Final[int] = 13
+    CPU_OUT_EXIT_CODE: Final[int] = 17
+    MEM_OUT_EXIT_CODE: Final[int] = 19
+
 
 SHELL_PARSER_GROUP_NAME: Final[str] = "WHERE"
 SHELL_SERVER_PARSER_NAME: Final[str] = "server"
@@ -49,9 +52,18 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 # Shell Variables
 class VarClass(Protocol):
-    vars: ClassVar[Mapping[str, ...]]
+    __slots__: Sequence = ()
+
+    _vars: ClassVar[Mapping[str, ...]]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
+
+    _vars: Dict[str, ...]
+    v: _VarGetter
+
+    @property
+    def vars(self) -> Mapping[str, ...]:
+        raise NotImplementedError
 
     def __getitem__(self, item: str):
         ...
@@ -71,7 +83,17 @@ class VarClass(Protocol):
 _T = TypeVar("_T", bound=VarClass)
 
 
+class ControllerOptionNames:
+    LOGGER: Final[str] = "logger"
+    CUSTOM_NAMESPACE: Final[str] = "custom_ns"
+    STDOUT: Final[str] = "stdout"
+    STDERR: Final[str] = "stderr"
+    ANNOUNCER: Final[str] = "announcer"
+
+
 class _DefaultVarsFields(Protocol):
+    __slots__: Sequence = ()
+
     SERVER_URL: ClassVar[str]
     SERVER_PORT: ClassVar[str]
     ALLOW_OTHER_ORIGIN: ClassVar[str]
@@ -82,28 +104,31 @@ class _DefaultVarsFields(Protocol):
     IS_LOCAL: ClassVar[str]
     RAND_SEED: ClassVar[str]
     FLOAT_PRECISION: ClassVar[str]
-    TARGET_VERSION: ClassVar[str]
     LOGGER: ClassVar[str]
 
     REQUEST_DATA_CODE_NAME: ClassVar[str]
     REQUEST_DATA_GRAPH_NAME: ClassVar[str]
+    REQUEST_DATA_VERSION_NAME: ClassVar[str]
     REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
 
 
 class _VarGetter(_DefaultVarsFields):
+    __slots__ = ["_storage"]
+
     def __init__(self, storage: VarClass) -> None:
         self._storage = storage
 
     def __getattr__(self, item):
         if item not in self._storage.vars:
-            print(self._storage.vars)
             raise AttributeError(
-                f"'{self.__class__.__name__}' object has no attribute '{item}'"
+                f"'{self._storage.__class__.__name__}' object has no attribute '{item}'"
             )
         return self._storage[item]
 
 
 class DefaultVars(_DefaultVarsFields, VarClass):
+    __slots__ = ["_vars", "v"]
+
     SERVER_URL = "SERVER_URL"
     SERVER_PORT = "SERVER_PORT"
     ALLOW_OTHER_ORIGIN = "ALLOW_OTHER_ORIGIN"
@@ -114,14 +139,14 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     IS_LOCAL = "IS_LOCAL"
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
-    TARGET_VERSION = "TARGET_VERSION"
     LOGGER = "LOGGER"
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
     REQUEST_DATA_GRAPH_NAME = "REQUEST_DATA_GRAPH_NAME"
+    REQUEST_DATA_VERSION_NAME = "REQUEST_DATA_VERSION_NAME"
     REQUEST_DATA_OPTIONS_NAME = "REQUEST_DATA_OPTIONS_NAME"
 
-    vars = {
+    _default_vars = {
         SERVER_URL: "127.0.0.1",
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
@@ -133,10 +158,10 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
-        TARGET_VERSION: None,
         #
         REQUEST_DATA_CODE_NAME: "code",
         REQUEST_DATA_GRAPH_NAME: "graph",
+        REQUEST_DATA_VERSION_NAME: "version",
         REQUEST_DATA_OPTIONS_NAME: "options",
     }
 
@@ -144,7 +169,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         SERVER_URL: (
             ("-u", "--url"),
             {
-                "default": vars[SERVER_URL],
+                "default": _default_vars[SERVER_URL],
                 "type": str,
                 "help": "The url the local server will run on",
             },
@@ -152,19 +177,19 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         SERVER_PORT: (
             ("-p", "--port"),
             {
-                "default": vars[SERVER_PORT],
+                "default": _default_vars[SERVER_PORT],
                 "type": int,
                 "help": "The port the local server will run on",
             },
         ),
         ALLOW_OTHER_ORIGIN: (
             ("-a", "--allow-origin"),
-            {"default": vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
+            {"default": _default_vars[ALLOW_OTHER_ORIGIN], "action": "store_true"},
         ),
         ACCEPTED_ORIGINS: (
             ("-o", "--origin"),
             {
-                "default": vars[ACCEPTED_ORIGINS],
+                "default": _default_vars[ACCEPTED_ORIGINS],
                 "action": "extend",
                 "nargs": "+",
                 "type": str,
@@ -175,43 +200,39 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         EXEC_TIME_OUT: (
             ("-t", "--time-out"),
             {
-                "default": vars[EXEC_TIME_OUT],
+                "default": _default_vars[EXEC_TIME_OUT],
                 "type": int,
             },
         ),
         EXEC_MEM_OUT: (
             ("-m", "--mem-out"),
             {
-                "default": vars[EXEC_MEM_OUT],
+                "default": _default_vars[EXEC_MEM_OUT],
                 "type": int,
             },
         ),
         IS_LOCAL: (
             ("-i", "--is-local"),
-            {"default": vars[IS_LOCAL], "action": "store_true"},
+            {"default": _default_vars[IS_LOCAL], "action": "store_true"},
         ),
         RAND_SEED: (
             ("-r", "--rand-seed"),
             {
-                "default": str(vars[RAND_SEED]),
+                "default": str(_default_vars[RAND_SEED]),
                 "type": lambda x: None if x.strip() == "None" else int(x),
             },
         ),
         FLOAT_PRECISION: (
             ("-f", "--float-precision"),
             {
-                "default": vars[FLOAT_PRECISION],
+                "default": _default_vars[FLOAT_PRECISION],
                 "type": int,
             },
-        ),
-        TARGET_VERSION: (
-            ("-v", "--target-version"),
-            {"default": vars[TARGET_VERSION], "type": str},
         ),
         LOGGER: (
             ("-l", "--logger"),
             {
-                "default": vars[LOGGER],
+                "default": _default_vars[LOGGER],
                 "choices": [*AVAILABLE_LOGGERS.values()],
                 "type": AVAILABLE_LOGGERS.get,
                 "metavar": f"{{{', '.join(AVAILABLE_LOGGERS.keys())}}}",
@@ -220,12 +241,12 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     }
 
     def __init__(self, **kwargs):
-        self.vars = {**self.vars, **kwargs}
+        self._vars: Dict = {**self._default_vars, **kwargs}
         self.read_from_env(all_args=True)
         self.v = _VarGetter(self)
 
     def __getitem__(self, item: str):
-        return self.vars[item]
+        return self._vars[item]
 
     @classmethod
     def make_shell_env_name(cls, name: str) -> str:
@@ -233,11 +254,11 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     def read_from_env(self, *args, all_args: bool = False) -> None:
         if all_args:
-            args = self.vars.keys()
+            args = self._vars.keys()
 
         for env_name in args:
             shell_env_name = self.make_shell_env_name(env_name)
-            original = self.vars[env_name]
+            original = self._vars[env_name]
             # type conversions from str to the proper type
             og_type = type(original)
             if og_type is list:
@@ -272,7 +293,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
             from_env = _getenv(shell_env_name, None)
             if from_env is not None:
-                self.vars[env_name] = og_type(from_env)
+                self._vars[env_name] = og_type(from_env)
 
     @classmethod
     def get_var_arg_name(cls, var_field: str) -> str:
@@ -287,8 +308,6 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     @classmethod
     def var_arg_has_value(cls, var_field: str) -> bool:
         if var_field == cls.LOGGER:
-            return False
-        if var_field == cls.TARGET_VERSION:
             return False
 
         if var_field in cls.server_shell_var:
@@ -307,4 +326,8 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     @classmethod
     def __class_getitem__(cls, item):
-        return cls.vars[item]
+        return cls._default_vars[item]
+
+    @property
+    def vars(self) -> Mapping[str, ...]:
+        return self._vars

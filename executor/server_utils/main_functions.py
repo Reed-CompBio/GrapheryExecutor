@@ -67,7 +67,7 @@ class ExecutorWSGIServer(WSGIServer):
             )
         else:
             try:
-                formatter.add_info(data=self.application_helper(environ))
+                formatter.add_info(result=self.application_helper(environ))
             except ExecutionError as e:
                 formatter.add_error(
                     message=f"Something wrong happens in you're code. Details: {e}",
@@ -144,8 +144,6 @@ class ExecutorWSGIServer(WSGIServer):
                 args.append(str(self.settings[k]))
             if k == self.settings.LOGGER:
                 args.append("shell_debug")
-            if k == self.settings.TARGET_VERSION:
-                args.append(SERVER_VERSION)
 
         args.append(SHELL_LOCAL_PARSER_NAME)
         return args
@@ -178,7 +176,7 @@ class ExecutorWSGIServer(WSGIServer):
             self.logger.warn(f"got empty running result: {command}")
             raise ExecutionError(
                 "Empty execution result. Error might have occurred in the execution.",
-                f"{stderr}",
+                stderr.decode() if stderr else "Empty stderr output",
             )
 
         stdout, stderr = stdout.decode(), stderr.decode()
@@ -188,7 +186,7 @@ class ExecutorWSGIServer(WSGIServer):
         except json.JSONDecodeError:
             raise ExecutionError(
                 f"Cannot unload execution subprocess result. Error might have occurred in the execution: {stdout}",
-                f"{stderr}",
+                stderr,
             )
 
         return res

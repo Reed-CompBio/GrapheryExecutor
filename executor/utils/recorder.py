@@ -58,6 +58,17 @@ def generate_hex() -> str:
 class Recorder:
     """check out RFC for more detail"""
 
+    __slots__ = [
+        "_changes",
+        "_final_changes",
+        "_color_mapping",
+        "_logger",
+        "_graph",
+        "_stdout",
+        "_stdout_cache",
+        "_float_precision",
+    ]
+
     _DEFAULT_COLOR_PALETTE = [
         "#828282",
         "#B15928",
@@ -277,15 +288,15 @@ class Recorder:
         get the access list from the last record
         :return: access list in the last record
         """
-        if self.get_last_record()["accesses"] is None:
-            self.get_last_record()["accesses"] = []
+        if self.get_last_record()[self.ACCESS_HEADER] is None:
+            self.get_last_record()[self.ACCESS_HEADER] = []
 
-        return self.get_last_record()["accesses"]
+        return self.get_last_record()[self.ACCESS_HEADER]
 
     def _generate_repr(self, variable_state: Any) -> str:
         try:
             if isinstance(variable_state, float):
-                repr_result = f"{{:.{self._float_precision}f}}".format(variable_state)
+                repr_result = f"{variable_state:.{self._float_precision}f}"
             else:
                 repr_result = repr(variable_state)
         except Exception:

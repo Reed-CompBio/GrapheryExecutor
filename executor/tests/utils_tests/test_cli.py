@@ -43,7 +43,7 @@ class TestArgparse:
         ],
     )
     def test_server_args(self, server_setting: str, var: Any, expected: Any):
-        # ehhhh, ugly
+        # ehh, ugly
         args = [SHELL_SERVER_PARSER_NAME]
         arg_name = self.settings.get_var_arg_name(server_setting)
 
@@ -70,7 +70,6 @@ class TestArgparse:
                 (DefaultVars.RAND_SEED, "None", None),
                 (DefaultVars.RAND_SEED, "10", 10),
                 (DefaultVars.FLOAT_PRECISION, "5", 5),
-                (DefaultVars.TARGET_VERSION, "3.0.0", "3.0.0"),
                 (DefaultVars.LOGGER, "shell_debug", shell_debug_logger),
             )
         ],

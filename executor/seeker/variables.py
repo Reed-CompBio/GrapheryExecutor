@@ -16,16 +16,18 @@ def needs_parentheses(source):
     def code(s):
         return compile(s, "<variable>", "eval").co_code
 
-    return code("{}.x".format(source)) != code("({}).x".format(source))
+    return code(f"{source}.x") != code(f"({source}).x")
 
 
 class BaseVariable(abc.ABC):
+    __slots__ = ["source", "unambiguous_source", "exclude", "code"]
+
     def __init__(self, source, exclude=()):
         self.source = source
         self.exclude = utils.ensure_tuple(exclude)
         self.code = compile(source, "<variable>", "eval")
         if needs_parentheses(source):
-            self.unambiguous_source = "({})".format(source)
+            self.unambiguous_source = f"({source})"
         else:
             self.unambiguous_source = source
 
@@ -83,6 +85,8 @@ class CommonVariable(BaseVariable):
     It cannot be further formatted
     """
 
+    __slots__ = ()
+
     def _values(self, main_value):
         result = [(self.source, main_value)]
         for key in self._safe_keys(main_value):
@@ -126,6 +130,8 @@ class Attrs(CommonVariable):
     The variable instance that watches the attributes of an object
     """
 
+    __slots__ = ()
+
     def _keys(self, main_value):
         return itertools.chain(
             getattr(main_value, "__dict__", ()), getattr(main_value, "__slots__", ())
@@ -143,6 +149,8 @@ class Keys(CommonVariable):
     The variable instance that watches the keys of a mapping
     """
 
+    __slots__ = ()
+
     def _keys(self, main_value):
         return main_value.keys()
 
@@ -158,7 +166,13 @@ class Indices(Keys):
     The variable instance that watches the indices of an sequence
     """
 
-    _slice = slice(None)
+    __slots__ = ["_slice"]
+
+    _default_slice = slice(None)
+
+    def __init__(self, source, exclude=()):
+        super().__init__(source, exclude)
+        self._slice = self._default_slice
 
     def _keys(self, main_value):
         return range(len(main_value))[self._slice]
@@ -175,6 +189,8 @@ class Exploding(BaseVariable):
     """
     Dynamic variable
     """
+
+    __slots__ = ()
 
     def _values(self, main_value):
         if isinstance(main_value, Mapping):

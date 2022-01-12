@@ -10,15 +10,17 @@ import pytest
 from platform import platform
 
 from ...settings import DefaultVars, SERVER_VERSION
+from ...settings.variables import NX_GRAPH_INJECTION_NAME, GRAPH_INJECTION_NAME
 from ...utils.controller import GraphController, ControllerResultAnnouncer
 
 _platform = platform()
-_versioned_settings = DefaultVars(**{DefaultVars.TARGET_VERSION: SERVER_VERSION})
+_settings = DefaultVars()
 
 
 def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
     ctrl = ctrl_cls(
-        default_settings=_versioned_settings,
+        target_version=SERVER_VERSION,
+        default_settings=_settings,
         **kwargs,
     ).init()
     # set is local when only running main
@@ -217,10 +219,9 @@ class TestGraphController:
         ctrl = self.controller(
             code=code,
             graph_data=graph_data,
+            target_version="wrong_ver",
             default_settings=not_versioned_settings,
         )
-        assert ctrl._target_version == not_versioned_settings.v.TARGET_VERSION
-
         with pytest.raises(SystemExit):
             ctrl.init()
 
@@ -278,3 +279,31 @@ class TestGraphController:
         with redirect_stdout(stream):
             ctrl.main(formats=True, announces=True)
         assert stream.getvalue() == format_val
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            dedent(
+                f"""\
+                g = globals()
+                {ass}
+                """
+            )
+            for ass in [
+                "assert 'nx' in g, f'nx not in globals, {g}'",
+                "assert 'networkx' in g, f'networkx not in globals, {g}'",
+                f"assert hasattr(nx, '{NX_GRAPH_INJECTION_NAME}'), f'{NX_GRAPH_INJECTION_NAME} not in networkx'",
+                f"assert '{NX_GRAPH_INJECTION_NAME}' in g, f'{NX_GRAPH_INJECTION_NAME} not in g'",
+                f"assert '{GRAPH_INJECTION_NAME}' in g, f'{GRAPH_INJECTION_NAME} not in g'",
+            ]
+        ],
+    )
+    def test_injection(self, code):
+        graph_data = {}
+        ctrl = make_test_controller_instance(
+            self.controller,
+            code=code,
+            graph_data=graph_data,
+            **{DefaultVars.IS_LOCAL: True},
+        )
+        ctrl.main()

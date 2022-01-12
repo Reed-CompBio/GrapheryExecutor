@@ -37,14 +37,11 @@ import networkx as nx
 
 from ..settings import (
     DefaultVars,
-    INIT_ERROR_CODE,
-    CPU_OUT_EXIT_CODE,
-    MEM_OUT_EXIT_CODE,
     SERVER_VERSION,
-    POST_ERROR_CODE,
-    PREP_ERROR_CODE,
-    RUNNER_ERROR_CODE,
-    CTRL_ERROR_CODE,
+    GRAPH_INJECTION_NAME,
+    NX_GRAPH_INJECTION_NAME,
+    ErrorCode,
+    ControllerOptionNames,
 )
 
 try:
@@ -107,6 +104,8 @@ def _builtins_iterator() -> Generator[tuple[str, Any], Any, None]:
 
 
 class LayerContext(contextlib.AbstractContextManager):
+    __slots__ = ["_ctrl"]
+
     def __init__(self, controller: Controller):
         self._ctrl = controller
 
@@ -126,6 +125,8 @@ class LayerContext(contextlib.AbstractContextManager):
 
 
 class _FDRedirectLayer(LayerContext):
+    __slots__ = ()
+
     def enter(self):
         self._ctrl.stdout_redirector.__enter__()
         # self._ctrl.stderr_redirector.__enter__()
@@ -138,6 +139,8 @@ class _FDRedirectLayer(LayerContext):
 
 
 class _ModuleRestrict(LayerContext):
+    __slots__ = ()
+
     def enter(self) -> None:
         if not self._ctrl.is_local:
             # The posix module is a built-in and has a ton of OS access
@@ -191,6 +194,8 @@ class _ModuleRestrict(LayerContext):
 
 
 class ControllerResultAnnouncer:
+    __slots__ = ["_out"]
+
     def __init__(self, output=_sys.stdout):
         self._out = output
 
@@ -198,12 +203,15 @@ class ControllerResultAnnouncer:
         self._out.write(s)
 
     def show_error(
-        self, exception: Exception, trace: str = None, error_code: int = 1
+        self,
+        exception: Exception,
+        trace: str = None,
+        error_code: ErrorCode = ErrorCode.CTRL_ERROR_CODE,
     ) -> NoReturn:
         from traceback import format_exc
 
         e = SystemExit(
-            f"An error occurs with exit code {error_code}. Error: {exception}\n"
+            f"An error occurs with exit code {error_code.value} ({error_code.name}). Error: {exception}\n"
             f"trace: \n"
             f"{trace if trace else format_exc()}"
         )
@@ -216,16 +224,18 @@ class ControllerResultAnnouncer:
 
 
 class _ResourceRestrict(LayerContext):
+    __slots__ = ()
+
     def _cpu_time_out_helper(self, sig_num, __):
         self._ctrl.announcer.show_error(
             ValueError(f"Allocated CPU time exhausted. Signal num: {sig_num}"),
-            error_code=CPU_OUT_EXIT_CODE,
+            error_code=ErrorCode.CPU_OUT_EXIT_CODE,
         )
 
     def _mem_consumed_helper(self, sig_num, __):
         self._ctrl.announcer.show_error(
             ValueError(f"Allocated MEM size exhausted. Signal num: {sig_num}"),
-            error_code=MEM_OUT_EXIT_CODE,
+            error_code=ErrorCode.MEM_OUT_EXIT_CODE,
         )
 
     def enter(self) -> None:
@@ -256,6 +266,8 @@ class _ResourceRestrict(LayerContext):
 
 
 class _RandomContext(LayerContext):
+    __slots__ = ()
+
     def enter(self) -> None:
         random.seed(self._ctrl.rand_seed)
         self._ctrl.logger.debug(f"set random seed to {self._ctrl.rand_seed}")
@@ -274,6 +286,31 @@ class Controller(Generic[_T]):
     """
     Controller class that controls the execution of some `runner` function
     """
+
+    __slots__ = [
+        "_BANNED_BUILTINS",
+        "_DEL_MODULES",
+        "_ALLOWED_STDLIB_MODULE_IMPORTS",
+        "_BUILTIN_IMPORT",
+        "_announcer",
+        "_stderr_redirector",
+        "_stdout_redirector",
+        "_stderr",
+        "_stdout",
+        "_rand_seed",
+        "_re_cpu_time",
+        "_re_mem_size",
+        "_user_globals",
+        "_custom_ns",
+        "_is_local",
+        "_in_context",
+        "_runner",
+        "_context_layers",
+        "_init_layers",
+        "_logger",
+        "_default_settings",
+        "_options",
+    ]
 
     _DEFAULT_CONTEXT_LAYERS = [
         _RandomContext,
@@ -304,12 +341,12 @@ class Controller(Generic[_T]):
         :param stderr:
         :param kwargs:
         """
-        options = {**default_settings.vars, **(options or {}), **kwargs}
+        self._options = {**default_settings.vars, **(options or {}), **kwargs}
         self._default_settings = default_settings
 
         # register logger
-        self._logger: Logger = options.get(
-            "logger", options.get(default_settings.LOGGER)
+        self._logger: Logger = self._options.get(
+            ControllerOptionNames.LOGGER, self._options.get(default_settings.LOGGER)
         )
 
         # register control layers
@@ -330,39 +367,38 @@ class Controller(Generic[_T]):
         self._in_context: bool = False
 
         # local flag
-        self._is_local: bool = options.get(default_settings.IS_LOCAL)
+        self._is_local: bool = self._options.get(default_settings.IS_LOCAL)
 
-        self._custom_ns: Dict[str, types.ModuleType] = options.get("custom_ns", {})
+        self._custom_ns: Dict[str, types.ModuleType] = self._options.get(
+            ControllerOptionNames.CUSTOM_NAMESPACE, {}
+        )
 
         # sandbox
         self._user_globals: Dict[str, Any] = {}
 
         self._logger.debug(f"controller uses settings {default_settings}")
 
-        self._re_mem_size = options.get(default_settings.EXEC_MEM_OUT,) * int(
+        self._re_mem_size = self._options.get(default_settings.EXEC_MEM_OUT,) * int(
             10e6
         )  # convert mb to bytes
         self._logger.debug(f"restricted memory size to {self._re_mem_size} bytes")
 
-        self._re_cpu_time = options.get(default_settings.EXEC_TIME_OUT)
+        self._re_cpu_time = self._options.get(default_settings.EXEC_TIME_OUT)
         self._logger.debug(f"restricted CPU time to {self._re_cpu_time} seconds")
 
-        self._rand_seed = options.get(default_settings.RAND_SEED)
+        self._rand_seed = self._options.get(default_settings.RAND_SEED)
         self._logger.debug(f"rand seed will be {self._rand_seed} in execution")
 
-        self._float_precision = options.get(default_settings.FLOAT_PRECISION)
-        self._logger.debug(
-            f"float precision will be {self._float_precision} in execution"
-        )
-
         # std
-        self._stdout = options.get("stdout", StringIO())
-        self._stderr = options.get("stderr", StringIO())
+        self._stdout = self._options.get(ControllerOptionNames.STDOUT, StringIO())
+        self._stderr = self._options.get(ControllerOptionNames.STDERR, StringIO())
         self._stdout_redirector = redirect_stdout(self._stdout)
         self._stderr_redirector = redirect_stderr(self._stderr)
 
         # formatter
-        self._announcer = options.get("announcer", ControllerResultAnnouncer())
+        self._announcer = self._options.get(
+            ControllerOptionNames.ANNOUNCER, ControllerResultAnnouncer()
+        )
 
         # args
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
@@ -453,7 +489,7 @@ class Controller(Generic[_T]):
         def _err_fn(*_, **__):
             raise Exception(
                 f"'{fn}' is not supported by Executor. \n"
-                f"If you're using a local instance, please try to turn on is_local_flag"
+                f"If you're using a local instance, please try to turn on is_local"
             )
 
         return _err_fn
@@ -482,7 +518,7 @@ class Controller(Generic[_T]):
                 "open() is not supported by Executor. \n"
                 "Instead use io.StringIO() to simulate a file. \n"
                 "Here is an example: https://goo.gl/uNvBGl \n"
-                "If you're using a local instance, please try to turn on is_local_flag"
+                "If you're using a local instance, please try to turn on is_local"
             )
 
         return _open
@@ -549,6 +585,7 @@ class Controller(Generic[_T]):
             raise ValueError("module should have at least a name")
         for alias in aliases:
             self._custom_ns[alias] = module
+        self._logger.debug(f"added module {module} under the name(s) {aliases}")
 
     # ===== custom modules end =====
 
@@ -627,7 +664,7 @@ class Controller(Generic[_T]):
         try:
             self._init_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=INIT_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.INIT_ERROR_CODE)
 
         return self
 
@@ -640,7 +677,7 @@ class Controller(Generic[_T]):
         try:
             self._prep_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=PREP_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.PREP_ERROR_CODE)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -655,7 +692,7 @@ class Controller(Generic[_T]):
         try:
             self._post_process()
         except Exception as e:
-            self._announcer.show_error(e, error_code=POST_ERROR_CODE)
+            self._announcer.show_error(e, error_code=ErrorCode.POST_ERROR_CODE)
 
     def _run(self, *args: _P.args, **kwargs: _P.kwargs) -> _T:
         """
@@ -675,7 +712,9 @@ class Controller(Generic[_T]):
 
             self._logger.debug("exception occurs in runner execution")
             self._announcer.show_error(
-                RunnerError(e), trace=format_exc(), error_code=RUNNER_ERROR_CODE
+                RunnerError(e),
+                trace=format_exc(),
+                error_code=ErrorCode.RUNNER_ERROR_CODE,
             )
             return
 
@@ -723,7 +762,7 @@ class Controller(Generic[_T]):
             try:
                 result = self.format_result(result)
             except Exception as e:
-                self._announcer.show_error(e, error_code=CTRL_ERROR_CODE)
+                self._announcer.show_error(e, error_code=ErrorCode.CTRL_ERROR_CODE)
 
         if announces:
             self._logger.debug("announcing result from main")
@@ -778,13 +817,24 @@ class GraphController(Controller[List[MutableMapping]]):
     Graph controller for Graphery Executor
     """
 
+    __slots__ = [
+        "_code",
+        "_graph_data",
+        "_target_version",
+        "_graph",
+        "_float_precision",
+        "_recorder",
+        "_tracer",
+    ]
+
     _graph_builder = nx.cytoscape_graph
 
     def __init__(
         self,
         *,
         code: str,
-        graph_data: dict | str,
+        graph_data: Dict | str,
+        target_version: str,
         context_layers: Sequence[Type[LayerContext]] = (),
         default_settings: DefaultVars = DefaultVars(),
         options: Mapping = None,
@@ -801,8 +851,13 @@ class GraphController(Controller[List[MutableMapping]]):
         # collect basic data
         self._code = code
         self._graph_data = graph_data
-        self._target_version = default_settings.v.TARGET_VERSION
+        self._target_version = target_version
         self._graph: nx.Graph | None = None  # placeholder
+
+        self._float_precision = self._options.get(default_settings.FLOAT_PRECISION)
+        self._logger.debug(
+            f"float precision will be {self._float_precision} in execution"
+        )
 
         # collect recorder and tracer
         self._recorder: _recorder_cls | None = None  # placeholder
@@ -865,7 +920,7 @@ class GraphController(Controller[List[MutableMapping]]):
     def _check_version(self) -> None:
         if self._target_version != SERVER_VERSION:
             raise ValueError(
-                f"Request Version {self._target_version} does not match Server Version {SERVER_VERSION}"
+                f"Request Version '{self._target_version}' does not match Server Version '{SERVER_VERSION}'"
             )
 
     @classmethod
@@ -880,7 +935,9 @@ class GraphController(Controller[List[MutableMapping]]):
         )
 
     def _collect_globals(self) -> None:
+        setattr(nx, NX_GRAPH_INJECTION_NAME, self._graph)
         self._add_custom_module(nx, "nx", "networkx")
+        self._logger.debug("injected networkx")
 
         # place trace
         self._update_globals("tracer", self._tracer)
@@ -889,8 +946,9 @@ class GraphController(Controller[List[MutableMapping]]):
         self._update_globals("peek", self._tracer.peek)
         self._logger.debug("collects `peek` helper")
 
-        self._update_globals("graph", self._graph)
-        self._logger.debug(f"updated graph in user globals with {self._graph}")
+        self._update_globals(GRAPH_INJECTION_NAME, self._graph)
+        self._update_globals(NX_GRAPH_INJECTION_NAME, self._graph)
+        self._logger.debug("injected graphs")
 
         super(GraphController, self)._collect_globals()
 
