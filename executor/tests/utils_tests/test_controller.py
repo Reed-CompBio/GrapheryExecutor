@@ -58,6 +58,29 @@ class TestGraphController:
             ctrl.main()
 
     @pytest.mark.parametrize(
+        "code",
+        [
+            dedent(
+                """\
+                import networkx.generators as gg
+                gg.atlas.os
+                """
+            ),
+            dedent(
+                """\
+                from networkx.generators import atlas
+                atlas.os
+                """
+            ),
+        ],
+    )
+    def test_dangerous_code(self, code):
+        ctrl = make_test_controller_instance(self.controller, code=code, graph_data={})
+
+        with pytest.raises(SystemExit):
+            ctrl.main()
+
+    @pytest.mark.parametrize(
         "code, graph_data",
         [
             (f"import {mod}", {})

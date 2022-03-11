@@ -311,6 +311,7 @@ class Controller(Generic[_T]):
         "_default_settings",
         "_options",
     ]
+    _SANITIZED_FLAG_NAME = "__SANITIZED__"
 
     _DEFAULT_CONTEXT_LAYERS = [
         _RandomContext,
@@ -418,6 +419,8 @@ class Controller(Generic[_T]):
             "bisect",
             "copy",
             "hashlib",
+            "typing",
+            "types",
         ]
         self._DEL_MODULES: Final = ["os", "sys", "posix", "gc", "_sys", "_os"]
         self._BANNED_BUILTINS: Final = [
@@ -441,12 +444,42 @@ class Controller(Generic[_T]):
             "license",
         ]
 
+    def _sanitize_module(self, module: types.ModuleType) -> types.ModuleType:
+        """
+        somewhat weak protection against imported modules that contain one
+        of these troublesome builtins. again, NOTHING is foolproof ...
+        just more defense in depth :)
+        :param module: module to sanitize
+        :return: sanitized module
+        """
+
+        for mod in self._DEL_MODULES:
+            if hasattr(module, mod):
+                delattr(module, mod)
+
+        setattr(module, self._SANITIZED_FLAG_NAME, True)
+        for ele_name in dir(module):
+            ele = getattr(module, ele_name)
+            if isinstance(ele, types.ModuleType):
+                try:
+                    if not getattr(
+                        ele, self._SANITIZED_FLAG_NAME, False
+                    ) and ele.__package__.startswith("networkx"):
+                        self._sanitize_module(ele)
+                except ModuleNotFoundError:
+                    self._logger.exception(
+                        f"failed to sanitize module {ele} due to import error within {ele}"
+                    )
+
+        return module
+
     # ===== global helpers =====
     def _create_restrict_import(self) -> Callable:
         """
         make a restricted version of __import__ that only imports whitelisted modules
         :return: the customized __import__ wrapper
         """
+        whitelisted_imports = self._ALLOWED_STDLIB_MODULE_IMPORTS
 
         def __restricted_import__(*args):
             # Restrict imports to a whitelist
@@ -454,27 +487,20 @@ class Controller(Generic[_T]):
             # subclass str and bypass the 'in' test on the next line
             args = [e for e in args if type(e) is str]
 
-            whitelisted_imports = self._ALLOWED_STDLIB_MODULE_IMPORTS
-
-            importing_name = args[0]
+            importing_name: str = args[0]
 
             if importing_name in self._custom_ns and isinstance(
                 result := self._custom_ns[importing_name], types.ModuleType
             ):
-                return result
-            elif importing_name in whitelisted_imports:
-                imported_mod = self._BUILTIN_IMPORT(*args)
-
-                # somewhat weak protection against imported modules that contain one
-                # of these troublesome builtins. again, NOTHING is foolproof ...
-                # just more defense in depth :)
-                for mod in self._DEL_MODULES:
-                    if hasattr(imported_mod, mod):
-                        delattr(imported_mod, mod)
-
-                return imported_mod
+                mod = result
+            elif importing_name in whitelisted_imports or importing_name.startswith(
+                "networkx"
+            ):
+                mod = self._BUILTIN_IMPORT(*args)
             else:
                 raise ImportError(f"{importing_name} not supported.")
+
+            return self._sanitize_module(mod)
 
         return __restricted_import__
 
@@ -583,6 +609,8 @@ class Controller(Generic[_T]):
     def _add_custom_module(self, module: types.ModuleType, *aliases: str) -> None:
         if len(aliases) < 1:
             raise ValueError("module should have at least a name")
+
+        module = self._sanitize_module(module)
         for alias in aliases:
             self._custom_ns[alias] = module
         self._logger.debug(f"added module {module} under the name(s) {aliases}")
