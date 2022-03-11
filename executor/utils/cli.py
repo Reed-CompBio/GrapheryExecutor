@@ -66,7 +66,7 @@ def _local_run(settings: DefaultVars) -> None:
     graph: Dict = request_obj[settings.v.REQUEST_DATA_GRAPH_NAME]
     logger.debug(f"parsed graph {graph}")
 
-    target_version: str = request_obj[settings.v.REQUEST_DATA_VERSION_NAME]
+    target_version: str = request_obj.get(settings.v.REQUEST_DATA_VERSION_NAME, "null")
     logger.debug(f"parsed version {target_version}")
 
     options: Dict[str, Any] = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
