@@ -1,5 +1,8 @@
 # use python 3.10 base image
-FROM python:3.10
+FROM python:3.10.2-alpine
+
+# install git
+RUN apk add git
 
 # specify working directory
 WORKDIR /code
