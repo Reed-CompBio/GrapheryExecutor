@@ -6,4 +6,4 @@
 #
 
 -i https://pypi.org/simple
--e git+https://github.com/Reed-CompBio/networkx.git@b1224fdab2c18cdcb58dde29d075e5208e7cd414#egg=networkg
+-e git+https://github.com/Reed-CompBio/networkx.git@c266c4b29699290333dff5440e3c9e3029ec0341#egg=networkg

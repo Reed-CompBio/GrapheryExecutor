@@ -20,7 +20,7 @@ with open("executor/settings/variables.py") as fid:
 setuptools.setup(
     name="executor",
     version=version,
-    packages=setuptools.find_packages(exclude=["tests*"]),
+    packages=setuptools.find_packages(exclude=["executor.tests*"]),
     author="Larry Zeng",
     author_email="zengl@reed.edu",
     description="Graphery Executor",
@@ -39,8 +39,9 @@ setuptools.setup(
         "Source Code": "https://github.com/Reed-CompBio/GrapheryExecutor",
     },
     classifiers=[
-        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.10",
