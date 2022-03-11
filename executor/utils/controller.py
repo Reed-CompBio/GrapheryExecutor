@@ -11,6 +11,7 @@ import sys as _sys
 import types
 from io import StringIO
 from logging import Logger
+import typing
 from typing import (
     Sequence,
     Type,
@@ -966,6 +967,10 @@ class GraphController(Controller[List[MutableMapping]]):
         setattr(nx, NX_GRAPH_INJECTION_NAME, self._graph)
         self._add_custom_module(nx, "nx", "networkx")
         self._logger.debug("injected networkx")
+
+        self._add_custom_module(typing, "typing")
+        self._add_custom_module(types, "types")
+        self._logger.debug("injected typing modules")
 
         # place trace
         self._update_globals("tracer", self._tracer)
