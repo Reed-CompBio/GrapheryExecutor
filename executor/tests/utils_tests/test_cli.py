@@ -70,6 +70,9 @@ class TestArgparse:
                 (DefaultVars.RAND_SEED, "None", None),
                 (DefaultVars.RAND_SEED, "10", 10),
                 (DefaultVars.FLOAT_PRECISION, "5", 5),
+                (DefaultVars.INPUT_LIST, "[]", []),
+                (DefaultVars.INPUT_LIST, '["10", "20", "30"]', ["10", "20", "30"]),
+                (DefaultVars.INPUT_LIST, "10\n20\n30", ["10", "20", "30"]),
                 (DefaultVars.LOGGER, "shell_debug", shell_debug_logger),
             )
         ],

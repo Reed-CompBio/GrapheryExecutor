@@ -25,7 +25,7 @@ setuptools.setup(
     author_email="zengl@reed.edu",
     description="Graphery Executor",
     install_requires=[
-        "networkg @ git+https://github.com/Reed-CompBio/networkx.git@networkg-2.6#egg=networkg"
+        "networkg @ git+https://github.com/Reed-CompBio/networkx.git@networkg-2.7.1r2#egg=networkg"
     ],
     entry_points={
         "console_scripts": [f"{prog_name}=executor:main"],

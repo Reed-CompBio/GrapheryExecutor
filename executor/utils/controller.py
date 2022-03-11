@@ -11,6 +11,7 @@ import sys as _sys
 import types
 from io import StringIO
 from logging import Logger
+import typing
 from typing import (
     Sequence,
     Type,
@@ -65,7 +66,7 @@ LAYER_TYPE: TypeAlias = "Callable[[Controller], None]"
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
-
+_CTRL_SELF = TypeVar("_CTRL_SELF", bound="Controller")
 
 _DEFAULT_MODULE_NAME: Final[str] = "__main__"
 _DEFAULT_FILE_NAME: Final[str] = "<graphery_main>"
@@ -311,6 +312,7 @@ class Controller(Generic[_T]):
         "_default_settings",
         "_options",
     ]
+    _SANITIZED_FLAG_NAME = "__SANITIZED__"
 
     _DEFAULT_CONTEXT_LAYERS = [
         _RandomContext,
@@ -418,6 +420,8 @@ class Controller(Generic[_T]):
             "bisect",
             "copy",
             "hashlib",
+            "typing",
+            "types",
         ]
         self._DEL_MODULES: Final = ["os", "sys", "posix", "gc", "_sys", "_os"]
         self._BANNED_BUILTINS: Final = [
@@ -441,12 +445,42 @@ class Controller(Generic[_T]):
             "license",
         ]
 
+    def _sanitize_module(self, module: types.ModuleType) -> types.ModuleType:
+        """
+        somewhat weak protection against imported modules that contain one
+        of these troublesome builtins. again, NOTHING is foolproof ...
+        just more defense in depth :)
+        :param module: module to sanitize
+        :return: sanitized module
+        """
+
+        for mod in self._DEL_MODULES:
+            if hasattr(module, mod):
+                delattr(module, mod)
+
+        setattr(module, self._SANITIZED_FLAG_NAME, True)
+        for ele_name in dir(module):
+            ele = getattr(module, ele_name)
+            if isinstance(ele, types.ModuleType):
+                try:
+                    if not getattr(
+                        ele, self._SANITIZED_FLAG_NAME, False
+                    ) and ele.__package__.startswith("networkx"):
+                        self._sanitize_module(ele)
+                except ModuleNotFoundError:
+                    self._logger.exception(
+                        f"failed to sanitize module {ele} due to import error within {ele}"
+                    )
+
+        return module
+
     # ===== global helpers =====
     def _create_restrict_import(self) -> Callable:
         """
         make a restricted version of __import__ that only imports whitelisted modules
         :return: the customized __import__ wrapper
         """
+        whitelisted_imports = self._ALLOWED_STDLIB_MODULE_IMPORTS
 
         def __restricted_import__(*args):
             # Restrict imports to a whitelist
@@ -454,27 +488,20 @@ class Controller(Generic[_T]):
             # subclass str and bypass the 'in' test on the next line
             args = [e for e in args if type(e) is str]
 
-            whitelisted_imports = self._ALLOWED_STDLIB_MODULE_IMPORTS
-
-            importing_name = args[0]
+            importing_name: str = args[0]
 
             if importing_name in self._custom_ns and isinstance(
                 result := self._custom_ns[importing_name], types.ModuleType
             ):
-                return result
-            elif importing_name in whitelisted_imports:
-                imported_mod = self._BUILTIN_IMPORT(*args)
-
-                # somewhat weak protection against imported modules that contain one
-                # of these troublesome builtins. again, NOTHING is foolproof ...
-                # just more defense in depth :)
-                for mod in self._DEL_MODULES:
-                    if hasattr(imported_mod, mod):
-                        delattr(imported_mod, mod)
-
-                return imported_mod
+                mod = result
+            elif importing_name in whitelisted_imports or importing_name.startswith(
+                "networkx"
+            ):
+                mod = self._BUILTIN_IMPORT(*args)
             else:
                 raise ImportError(f"{importing_name} not supported.")
+
+            return self._sanitize_module(mod)
 
         return __restricted_import__
 
@@ -496,19 +523,9 @@ class Controller(Generic[_T]):
 
     def _create_raw_input(self) -> Callable:
         """
-        make a `input` function wrapper. Currently the input function is banned.
+        Currently the input function is banned.
         :return: the input wrapper
         """
-        # def _input(prompt = ""):
-        #     if input_string_queue:
-        #         input_str = input_string_queue.pop(0)
-        #
-        #         # write the prompt and user input to stdout, to emulate what happens
-        #         # at the terminal
-        #         sys.stdout.write(str(prompt))  # always convert prompt into a string
-        #         sys.stdout.write(input_str + "\n")  # newline to simulate the user hitting Enter
-        #         return input_str
-        #     raise RawInputException(str(prompt))  # always convert prompt into a string
         return self._create_banned_builtins("input")
 
     @staticmethod
@@ -551,9 +568,9 @@ class Controller(Generic[_T]):
                 _user_builtins[k] = self._create_restrict_import()
             else:
                 if k == "raw_input":
-                    _user_builtins[k] = self._create_raw_input
+                    _user_builtins[k] = self._create_raw_input()
                 elif k == "input":
-                    _user_builtins[k] = self._create_raw_input
+                    _user_builtins[k] = self._create_raw_input()
                 else:
                     _user_builtins[k] = v
         self._update_globals("__builtins__", _user_builtins)
@@ -583,6 +600,8 @@ class Controller(Generic[_T]):
     def _add_custom_module(self, module: types.ModuleType, *aliases: str) -> None:
         if len(aliases) < 1:
             raise ValueError("module should have at least a name")
+
+        module = self._sanitize_module(module)
         for alias in aliases:
             self._custom_ns[alias] = module
         self._logger.debug(f"added module {module} under the name(s) {aliases}")
@@ -653,7 +672,7 @@ class Controller(Generic[_T]):
 
     # ===== basic structures =====
 
-    def __call__(self, *args, **kwargs) -> Controller[_T]:
+    def __call__(self, *args, **kwargs) -> _CTRL_SELF[_T]:
         """
         init process caller
         intended to usage: `controller_instance().main()`
@@ -728,7 +747,7 @@ class Controller(Generic[_T]):
     # ===== basic structures end =====
 
     # ===== main fn =====
-    def init(self, *args, **kwargs) -> Controller[_T]:
+    def init(self, *args, **kwargs) -> _CTRL_SELF[_T]:
         """
         same as `__call__`, but probably looks nicer
         intended usage: `controller_instance.init().main()`
@@ -823,6 +842,7 @@ class GraphController(Controller[List[MutableMapping]]):
         "_target_version",
         "_graph",
         "_float_precision",
+        "_input_list",
         "_recorder",
         "_tracer",
     ]
@@ -854,10 +874,12 @@ class GraphController(Controller[List[MutableMapping]]):
         self._target_version = target_version
         self._graph: nx.Graph | None = None  # placeholder
 
-        self._float_precision = self._options.get(default_settings.FLOAT_PRECISION)
+        self._float_precision: int = self._options.get(default_settings.FLOAT_PRECISION)
         self._logger.debug(
             f"float precision will be {self._float_precision} in execution"
         )
+        self._input_list: List[str] = self._options.get(default_settings.INPUT_LIST)
+        self._logger.debug(f"input list is loaded as {self._input_list} in execution")
 
         # collect recorder and tracer
         self._recorder: _recorder_cls | None = None  # placeholder
@@ -870,6 +892,24 @@ class GraphController(Controller[List[MutableMapping]]):
             "and graph data \n"
             f"{self._graph_data}"
         )
+
+    def _create_raw_input(self) -> Callable:
+        def _input(prompt: str = ""):
+            if self._input_list:
+                input_str = self._input_list.pop(0)
+
+                # write the prompt and user input to stdout,
+                # to emulate what happens at the terminal
+                self.stdout.write(str(prompt))
+                # always convert prompt into a string
+                self.stdout.write(f"{input_str}\n")
+                # newline to simulate the user hitting Enter
+                return input_str
+            raise ValueError(
+                f"Cannot answer the input({prompt}) due to too few given inputs"
+            )
+
+        return _input
 
     def _build_graph(self) -> None:
         if isinstance(self._graph_data, str):
@@ -939,6 +979,10 @@ class GraphController(Controller[List[MutableMapping]]):
         self._add_custom_module(nx, "nx", "networkx")
         self._logger.debug("injected networkx")
 
+        self._add_custom_module(typing, "typing")
+        self._add_custom_module(types, "types")
+        self._logger.debug("injected typing modules")
+
         # place trace
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
@@ -976,6 +1020,10 @@ class GraphController(Controller[List[MutableMapping]]):
 
     def format_result(self, result):
         return json.dumps(result)
+
+    @property
+    def input_list(self) -> List[str]:
+        return self._input_list
 
     @property
     def recorder(self):

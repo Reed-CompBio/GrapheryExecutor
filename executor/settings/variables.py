@@ -5,7 +5,17 @@ import json
 from logging import Logger
 from os import getenv as _getenv
 from types import NoneType
-from typing import TypeVar, Protocol, ClassVar, Mapping, Tuple, Dict, Final, Sequence
+from typing import (
+    TypeVar,
+    Protocol,
+    ClassVar,
+    Mapping,
+    Tuple,
+    Dict,
+    Final,
+    Sequence,
+    List,
+)
 
 __all__ = [
     "VarClass",
@@ -29,7 +39,7 @@ _ENV_PREFIX: Final[str] = "GE_"
 
 # Custom Variables
 PROG_NAME: Final[str] = "graphery_executor"
-SERVER_VERSION: Final[str] = "3.1.0"
+SERVER_VERSION: Final[str] = "3.2.0"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 GRAPH_INJECTION_NAME = "graph"
 NX_GRAPH_INJECTION_NAME = "g_graph"
@@ -92,6 +102,10 @@ class ControllerOptionNames:
 
 
 class _DefaultVarsFields(Protocol):
+    """
+    To be used in intelli scenes
+    """
+
     __slots__: Sequence = ()
 
     SERVER_URL: ClassVar[str]
@@ -104,6 +118,7 @@ class _DefaultVarsFields(Protocol):
     IS_LOCAL: ClassVar[str]
     RAND_SEED: ClassVar[str]
     FLOAT_PRECISION: ClassVar[str]
+    INPUT_LIST: ClassVar[str]
     LOGGER: ClassVar[str]
 
     REQUEST_DATA_CODE_NAME: ClassVar[str]
@@ -113,17 +128,44 @@ class _DefaultVarsFields(Protocol):
 
 
 class _VarGetter(_DefaultVarsFields):
+    """
+    This is a proxy of getting Vars from Var Settings
+    """
+
     __slots__ = ["_storage"]
 
     def __init__(self, storage: VarClass) -> None:
+        """
+        :param storage: the Var Settings to be proxied
+        """
         self._storage = storage
 
-    def __getattr__(self, item):
-        if item not in self._storage.vars:
+    def __getattr__(self, var_name):
+        """
+        Gets element of Var Settings by name
+        :param var_name:
+        :return:
+        """
+        if var_name not in self._storage.vars:
             raise AttributeError(
-                f"'{self._storage.__class__.__name__}' object has no attribute '{item}'"
+                f"'{self._storage.__class__.__name__}' object has no attribute '{var_name}'"
             )
-        return self._storage[item]
+        return self._storage[var_name]
+
+
+def _parse_str_list(string: str) -> List[str]:
+    """
+    Parse a list of string from string like "['a', 'b', 'c']" or those separated by \n
+    :param string: string like "['a', 'b', 'c']" or those separated by \n
+    :return: a list of string
+    """
+    try:
+        res = json.loads(string)
+        if not isinstance(res, list):
+            raise TypeError
+        return res
+    except (TypeError, json.JSONDecodeError):
+        return string.split("\n")
 
 
 class DefaultVars(_DefaultVarsFields, VarClass):
@@ -139,6 +181,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     IS_LOCAL = "IS_LOCAL"
     RAND_SEED = "RAND_SEED"
     FLOAT_PRECISION = "FLOAT_PRECISION"
+    INPUT_LIST = "INPUT_LIST"
     LOGGER = "LOGGER"
 
     REQUEST_DATA_CODE_NAME = "REQUEST_DATA_CODE_NAME"
@@ -158,6 +201,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         IS_LOCAL: False,
         RAND_SEED: 0,
         FLOAT_PRECISION: 4,
+        INPUT_LIST: [],
         #
         REQUEST_DATA_CODE_NAME: "code",
         REQUEST_DATA_GRAPH_NAME: "graph",
@@ -218,7 +262,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         RAND_SEED: (
             ("-r", "--rand-seed"),
             {
-                "default": str(_default_vars[RAND_SEED]),
+                "default": _default_vars[RAND_SEED],
                 "type": lambda x: None if x.strip() == "None" else int(x),
             },
         ),
@@ -227,6 +271,13 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             {
                 "default": _default_vars[FLOAT_PRECISION],
                 "type": int,
+            },
+        ),
+        INPUT_LIST: (
+            ("-s", "--input-list"),
+            {
+                "default": _default_vars[INPUT_LIST],
+                "type": _parse_str_list,
             },
         ),
         LOGGER: (
@@ -243,16 +294,30 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     def __init__(self, **kwargs):
         self._vars: Dict = {**self._default_vars, **kwargs}
         self.read_from_env(all_args=True)
-        self.v = _VarGetter(self)
+
+        # the proxy object to enable "settings.v.LOGGER"
+        self.v: _VarGetter = _VarGetter(self)
 
     def __getitem__(self, item: str):
         return self._vars[item]
 
     @classmethod
     def make_shell_env_name(cls, name: str) -> str:
+        """
+        Makes shell variable name with variable name by adding prefix _ENV_PREFIX
+        :param name: the variable name
+        :return: prefixed shell variable name
+        """
         return f"{_ENV_PREFIX}{name}"
 
     def read_from_env(self, *args, all_args: bool = False) -> None:
+        """
+        Reads the shell environment variables and updates the internal variables.
+
+        :param args: The names of the variables to read.
+        :param all_args: If True, all shell environment variables will be read. This will override the args parameter.
+        :return: None
+        """
         if all_args:
             args = self._vars.keys()
 
@@ -262,9 +327,10 @@ class DefaultVars(_DefaultVarsFields, VarClass):
             # type conversions from str to the proper type
             og_type = type(original)
             if og_type is list:
-                og_type = json.loads
+                # if the type of the original is list, use json loads to parse
+                og_type = _parse_str_list
             elif og_type is bool:
-
+                # if the type of the original is bool, use custom bool parser
                 def parse_bool(x: str):
                     x = x.lower()
                     if x == "true" or x == "t":
@@ -276,7 +342,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
                 og_type = parse_bool
             elif og_type is int:
-
+                # if the type of the original is int, then parse the string as int unless it's "none"
                 def parse_int(x: str):
                     x = x.lower()
                     if x == "none":
@@ -287,9 +353,12 @@ class DefaultVars(_DefaultVarsFields, VarClass):
                 og_type = parse_int
 
             elif og_type is Logger:
+                # if the type of the original is Logger, get the logger from the string
                 og_type = AVAILABLE_LOGGERS.get
             elif og_type == NoneType:
+                # if the type of the original is None, use string to parse it
                 og_type = str
+            # otherwise, use the original type parser to parse it (e.g. str)
 
             from_env = _getenv(shell_env_name, None)
             if from_env is not None:
@@ -297,16 +366,29 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     @classmethod
     def get_var_arg_name(cls, var_field: str) -> str:
+        """
+        Gets the argument name for a variable. (e.g. -s for input_list)
+        :param var_field: the variable field name
+        :return: the argument name
+        """
         if var_field in cls.server_shell_var:
+            # use the server shell var if the var is in the server shell var list
             store = cls.server_shell_var
         elif var_field in cls.general_shell_var:
+            # use the general shell var if the var is in the general shell var list
             store = cls.general_shell_var
         else:
             raise ValueError(f"unknown arg name {var_field}")
+        # get the arg name from the store
         return store[var_field][0][0]
 
     @classmethod
     def var_arg_has_value(cls, var_field: str) -> bool:
+        """
+        Checks if the variable has a value. (e.g. -l for --logger doesn't have a value)
+        :param var_field: the variable field name
+        :return: indicates if the variable has a value
+        """
         if var_field == cls.LOGGER:
             return False
 
@@ -326,8 +408,17 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
     @classmethod
     def __class_getitem__(cls, item):
+        """
+        Gets the default value of a variable name.
+        :param item: the variable name (e.g. cls.INPUT_LIST)
+        :return: the default value for that variable
+        """
         return cls._default_vars[item]
 
     @property
     def vars(self) -> Mapping[str, ...]:
+        """
+        Get the variable storage dictionary
+        :return:
+        """
         return self._vars
