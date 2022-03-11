@@ -102,6 +102,10 @@ class ControllerOptionNames:
 
 
 class _DefaultVarsFields(Protocol):
+    """
+    To be used in intelli scenes
+    """
+
     __slots__: Sequence = ()
 
     SERVER_URL: ClassVar[str]
@@ -124,27 +128,44 @@ class _DefaultVarsFields(Protocol):
 
 
 class _VarGetter(_DefaultVarsFields):
+    """
+    This is a proxy of getting Vars from Var Settings
+    """
+
     __slots__ = ["_storage"]
 
     def __init__(self, storage: VarClass) -> None:
+        """
+        :param storage: the Var Settings to be proxied
+        """
         self._storage = storage
 
-    def __getattr__(self, item):
-        if item not in self._storage.vars:
+    def __getattr__(self, var_name):
+        """
+        Gets element of Var Settings by name
+        :param var_name:
+        :return:
+        """
+        if var_name not in self._storage.vars:
             raise AttributeError(
-                f"'{self._storage.__class__.__name__}' object has no attribute '{item}'"
+                f"'{self._storage.__class__.__name__}' object has no attribute '{var_name}'"
             )
-        return self._storage[item]
+        return self._storage[var_name]
 
 
-def _parse_str_list(input_list: str) -> List[str]:
+def _parse_str_list(string: str) -> List[str]:
+    """
+    Parse a list of string from string like "['a', 'b', 'c']" or those separated by \n
+    :param string: string like "['a', 'b', 'c']" or those separated by \n
+    :return: a list of string
+    """
     try:
-        res = json.loads(input_list)
+        res = json.loads(string)
         if not isinstance(res, list):
             raise TypeError
         return res
     except (TypeError, json.JSONDecodeError):
-        return input_list.split("\n")
+        return string.split("\n")
 
 
 class DefaultVars(_DefaultVarsFields, VarClass):
