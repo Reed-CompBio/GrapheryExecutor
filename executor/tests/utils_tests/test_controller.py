@@ -4,7 +4,7 @@ from copy import deepcopy
 from logging import getLogger
 from operator import eq
 from textwrap import dedent
-from typing import Type, Callable
+from typing import Type, Callable, List
 
 import pytest
 from platform import platform
@@ -17,7 +17,9 @@ _platform = platform()
 _settings = DefaultVars()
 
 
-def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
+def make_test_controller_instance(
+    ctrl_cls: Type[GraphController], **kwargs
+) -> GraphController:
     ctrl = ctrl_cls(
         target_version=SERVER_VERSION,
         default_settings=_settings,
@@ -30,8 +32,8 @@ def make_test_controller_instance(ctrl_cls: Type[GraphController], **kwargs):
 
 class TestGraphController:
     def setup_class(self):
-        self.controller: Type[GraphController] = deepcopy(GraphController)
-        self.controller._graph_builder = dict
+        self.controller_cls: Type[GraphController] = deepcopy(GraphController)
+        self.controller_cls._graph_builder = dict
 
     @pytest.mark.skip("not available for now")
     def test_resource_restriction(self):
@@ -52,7 +54,7 @@ class TestGraphController:
     )
     def test_banning_dangerous_import(self, code, graph_data):
         ctrl = make_test_controller_instance(
-            self.controller, code=code, graph_data=graph_data
+            self.controller_cls, code=code, graph_data=graph_data
         )
         with pytest.raises(SystemExit):
             ctrl.main()
@@ -75,7 +77,9 @@ class TestGraphController:
         ],
     )
     def test_dangerous_code(self, code):
-        ctrl = make_test_controller_instance(self.controller, code=code, graph_data={})
+        ctrl = make_test_controller_instance(
+            self.controller_cls, code=code, graph_data={}
+        )
 
         with pytest.raises(SystemExit):
             ctrl.main()
@@ -104,7 +108,7 @@ class TestGraphController:
     )
     def test_allowed_import(self, code, graph_data):
         ctrl = make_test_controller_instance(
-            self.controller, code=code, graph_data=graph_data
+            self.controller_cls, code=code, graph_data=graph_data
         )
         result = ctrl.main()
         assert isinstance(result, list)
@@ -121,7 +125,7 @@ class TestGraphController:
         )
         graph_data = {}
         ctrl = make_test_controller_instance(
-            self.controller,
+            self.controller_cls,
             code=code,
             graph_data=graph_data,
             custom_ns={"var1": 1, "var2": 2},
@@ -138,7 +142,7 @@ class TestGraphController:
         )
         graph_data = {}
         ctrl = make_test_controller_instance(
-            self.controller,
+            self.controller_cls,
             code=code,
             graph_data=graph_data,
             custom_ns={"var1": 1, "var2": 2},
@@ -161,7 +165,7 @@ class TestGraphController:
         graph_data = {}
         err = io.StringIO()
         ctrl = make_test_controller_instance(
-            self.controller,
+            self.controller_cls,
             code=code,
             graph_data=graph_data,
             stderr=err,
@@ -224,13 +228,13 @@ class TestGraphController:
         code = ""
         graph_data = {}
         ctrl = make_test_controller_instance(
-            self.controller, code=code, graph_data=graph_data, options=options
+            self.controller_cls, code=code, graph_data=graph_data, options=options
         )
         assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
         ctrl.main()
 
         ctrl = make_test_controller_instance(
-            self.controller, code=code, graph_data=graph_data, **options
+            self.controller_cls, code=code, graph_data=graph_data, **options
         )
         assert cmp_fn(getattr(ctrl, attr_name), options[attr_name])
         ctrl.main()
@@ -239,7 +243,7 @@ class TestGraphController:
         code = ""
         graph_data = {}
         not_versioned_settings = DefaultVars()
-        ctrl = self.controller(
+        ctrl = self.controller_cls(
             code=code,
             graph_data=graph_data,
             target_version="wrong_ver",
@@ -274,15 +278,69 @@ class TestGraphController:
     )
     def test_banning_dangerous_builtin(self, code, graph_data):
         ctrl = make_test_controller_instance(
-            self.controller, code=code, graph_data=graph_data
+            self.controller_cls, code=code, graph_data=graph_data
         )
         with pytest.raises(SystemExit):
             ctrl.main()
 
+    @pytest.mark.parametrize(
+        "code, input_list, input_stdout_res, err",
+        [
+            (
+                dedent(
+                    """\
+                    li = [input(i) for i in range(5)]
+                    """
+                ),
+                ["a", "b", "c", "d", "e"],
+                "".join(
+                    map(
+                        lambda x: f"{x[0]}{x[1]}\n",
+                        zip(range(5), ["a", "b", "c", "d", "e"]),
+                    )
+                ),
+                False,
+            ),
+            (
+                dedent(
+                    """\
+                    li = [input(i) for i in range(5)]
+                    """
+                ),
+                ["a", "b", "c", "d"],
+                "".join(
+                    map(
+                        lambda x: f"{x[0]}{x[1]}\n",
+                        zip(range(5), ["a", "b", "c", "d"]),
+                    )
+                ),
+                True,
+            ),
+        ],
+    )
+    def test_input_list(
+        self, code: str, input_list: List[str], input_stdout_res: str, err: bool
+    ):
+        ctrl = make_test_controller_instance(
+            self.controller_cls,
+            code=code,
+            graph_data={},
+            **{DefaultVars.INPUT_LIST: input_list},
+        )
+        assert ctrl.input_list == input_list
+
+        if err:
+            with pytest.raises(SystemExit):
+                ctrl.main()
+        else:
+            ctrl.main()
+
+        assert ctrl.stdout.getvalue() == input_stdout_res
+
     def test_main_options(self):
         format_val = "format"
 
-        class _SubC(self.controller):
+        class _SubC(self.controller_cls):
             def format_result(self, result):
                 return format_val
 
@@ -324,7 +382,7 @@ class TestGraphController:
     def test_injection(self, code):
         graph_data = {}
         ctrl = make_test_controller_instance(
-            self.controller,
+            self.controller_cls,
             code=code,
             graph_data=graph_data,
             **{DefaultVars.IS_LOCAL: True},
