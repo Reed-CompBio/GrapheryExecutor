@@ -1,9 +1,9 @@
 echo "start setting up"
 
 iptables -P OUTPUT DROP \
-&& iptables -A OUTPUT -p tcp --sport 7590 -j ACCEPT \
+&& iptables -A OUTPUT -p tcp --sport "$GE_SERVER_PORT" -j ACCEPT \
 && iptables -P INPUT DROP \
-&& iptables -A INPUT -p tcp -s 172.19.0.0/24 -j ACCEPT \
+&& iptables -A INPUT -p tcp -s "$(hostname -i)/24" -j ACCEPT \
 && echo "iptables setup done"
 
 adduser --disabled-password -g "executor" executor \
