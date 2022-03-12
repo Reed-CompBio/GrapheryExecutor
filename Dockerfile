@@ -7,14 +7,10 @@ WORKDIR /code
 EXPOSE 7590 7590
 
 # copy src
-ADD ./ /code/executor/
+ADD ./ /code/
 
 # install requirements
-RUN apk add git && pip3 install /code/executor/
-
-# RUN sudo iptables -P OUTPUT DROP \
-#    && sudo iptables -A OUTPUT -p tcp -s 192.168.0.0/24 --dport 7590 -j ACCEPT \
-#    && sudo iptables -A OUTPUT -p udp -s 192.168.0.0/24 --dport 7590 -j ACCEPT
+RUN apk add git iptables ip6tables && pip3 install /code/
 
 # run command
-ENTRYPOINT ["graphery_executor", "server", "-u", "0.0.0.0"]
+ENTRYPOINT ["/bin/sh", "/code/setup.sh"]
