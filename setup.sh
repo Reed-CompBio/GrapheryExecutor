@@ -6,9 +6,6 @@ iptables -P OUTPUT DROP \
 && iptables -A INPUT -p tcp -s "$(hostname -i)/24" -j ACCEPT \
 && echo "iptables setup done"
 
-adduser --disabled-password -g "executor" executor \
-&& echo "add user executor done"
-
 su executor -c "graphery_executor server -u 0.0.0.0"
 echo "done executing"
 

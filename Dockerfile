@@ -10,7 +10,8 @@ EXPOSE 7590 7590
 ADD ./ /code/
 
 # install requirements
-RUN apk add git iptables ip6tables && pip3 install /code/
+RUN apk add git iptables ip6tables && pip3 install /code/ \
+    && adduser --disabled-password -g "executor" executor
 
 # run command
 ENTRYPOINT ["/bin/sh", "/code/setup.sh"]
