@@ -7,6 +7,8 @@ version of [NetworkX](https://github.com/Reed-CompBio/networkx) for graph suppor
 This set of scripts works with Graphery, and unlike the remote version provided by Graphery, this one can be used
 without restrictions.
 
+## Get Started
+
 There are two ways to start the executor server, one through scripts and one through docker. The python minimal version
 is `3.10`.
 
@@ -32,12 +34,13 @@ First, to install the executor,
    # press ctrl + c to exit 
    deactivate
    ```
-2. To run through docker,
+## Get Started with Docker
+To run through docker,
    ```shell
    docker compose up --build 
    ```
 
-Request Example:
+## Usage
 
 For the following python code:
 
