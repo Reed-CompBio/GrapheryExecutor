@@ -5,7 +5,6 @@ description = "The executor module for Graphery"
 authors = ["Larry Zeng <graphery@reed.edu>"]
 license = "MIT"
 readme = "README.md"
-url="https://github.com/Reed-CompBio/GrapheryExecutor"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -16,6 +15,7 @@ packages = [{include = "executor"}]
 exclude = ["executor/tests"]
 
 [tool.poetry.urls]
+"Repository" = "https://github.com/Reed-CompBio/GrapheryExecutor"
 "Bug Tracker" = "https://github.com/Reed-CompBio/GrapheryExecutor/issues"
 "Documentation" = "https://docs.graphery.reedcompbio.org"
 "Source Code" = "https://github.com/Reed-CompBio/GrapheryExecutor"
