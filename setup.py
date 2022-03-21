@@ -18,12 +18,12 @@ with open("executor/settings/variables.py") as fid:
 
 
 setuptools.setup(
-    name="executor",
+    name=prog_name,
     version=version,
-    packages=setuptools.find_packages(exclude=["tests*"]),
+    packages=setuptools.find_packages(exclude=["executor.tests*"]),
     author="Larry Zeng",
     author_email="zengl@reed.edu",
-    description="Graphery Executor",
+    description="The executor module for graphery",
     install_requires=[
         "networkg @ git+https://github.com/Reed-CompBio/networkx.git@networkg-2.7.1r2#egg=networkg"
     ],
@@ -35,12 +35,13 @@ setuptools.setup(
     url="https://github.com/Reed-CompBio/GrapheryExecutor",
     project_urls={
         "Bug Tracker": "https://github.com/Reed-CompBio/GrapheryExecutor/issues",
-        "Documentation": "http://docs.graphery.reedcompbio.org",
+        "Documentation": "https://docs.graphery.reedcompbio.org",
         "Source Code": "https://github.com/Reed-CompBio/GrapheryExecutor",
     },
     classifiers=[
-        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.10",
