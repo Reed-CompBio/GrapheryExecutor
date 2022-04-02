@@ -12,9 +12,11 @@ without restrictions.
 There are two ways to start the executor server, one through scripts and one through docker. The python minimal version
 is `3.10`.
 
+### With python venv
+
 First, to install the executor,
 
-1. To run through shell commands, `executor` has to be installed first through the following commands:
+`graphery_executor` has to be installed first through the following commands:
 
    ```shell
    # in the directory where you want to install graphery executor
@@ -23,22 +25,25 @@ First, to install the executor,
    python -m venv ./venv
    # switch into virtual environment to install
    source ./venv/bin/activate
-   pip install .
+   pip install -e .
    deactivate
    ```
 
-   To run the executor, use the following command
+To run the executor, use the following command
    ```shell
    source ./venv/bin/activate
    graphery_executor server
    # press ctrl + c to exit 
    deactivate
    ```
-## Get Started with Docker
+   
+### Get Started with Docker
+
 To run through docker,
    ```shell
    docker compose up --build 
    ```
+You can edit and copy `.env-example` to `.env` so that Docker can recognize environment variables without `export`. 
 
 ## Usage
 
@@ -88,6 +93,8 @@ test_tracer(7, 9, 11)
 ```
 
 in which the `version` field has to match the executor version to make the request acceptable. The option is detailed here (link coming soon). 
+
+Note that the version in the example may not always be up to date. Please update the version to the corresponding server version. 
 
 Once the request is executed, the server will return a response like the following whose structure is detailed here (link coming soon). 
 
