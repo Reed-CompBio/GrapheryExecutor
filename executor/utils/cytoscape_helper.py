@@ -96,6 +96,7 @@ def cyjs_from_graph(
         nodes.append(n)
 
     if graph.is_multigraph():
+        graph: nx.MultiGraph
         for e in graph.edges(keys=True):
             n = {"data": graph.adj[e[0]][e[1]][e[2]].copy()}
             n["data"]["source"] = e[0]
@@ -192,10 +193,10 @@ def graph_from_cyjs(
         graph = nx.Graph()
     if directed:
         graph = graph.to_directed()
-    graph.graph = dict(cyjs.get("data"))
+    graph.graph = dict(cyjs.get("data", []))
     for d in cyjs["elements"]["nodes"]:
         node_data = d["data"].copy()
-        node = d["data"]["value"]
+        node = d["data"][ident]
 
         if d["data"].get(name):
             node_data[name] = d["data"].get(name)
