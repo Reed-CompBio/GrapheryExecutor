@@ -23,7 +23,7 @@ exclude = ["executor/tests"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-networkg = {git = "https://github.com/Reed-CompBio/networkx.git", rev = "networkg-2.7.1r2"}
+networkg = {git = "https://github.com/Reed-CompBio/networkx.git", rev = "networkg-2.8.4r1"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"
