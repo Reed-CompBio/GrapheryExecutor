@@ -29,6 +29,7 @@ networkg = {git = "https://github.com/Reed-CompBio/networkx.git", rev = "network
 pytest = "^7.1.1"
 black = "^22.1.0"
 codacy-coverage = "^1.3.11"
+pre-commit = "^2.19.0"
 
 [tool.poetry.scripts]
 graphery_executor = "executor:main"
