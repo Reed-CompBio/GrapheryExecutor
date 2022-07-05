@@ -1,4 +1,5 @@
 import io
+import pathlib
 from contextlib import redirect_stdout
 from copy import deepcopy
 from logging import getLogger
@@ -386,5 +387,15 @@ class TestGraphController:
             code=code,
             graph_data=graph_data,
             **{DefaultVars.IS_LOCAL: True},
+        )
+        ctrl.main()
+
+    def test_code_execution(self):
+        with open(pathlib.Path(__file__).parent / "../example-code.py") as f:
+            code = f.read()
+
+        graph_data = {}
+        ctrl = make_test_controller_instance(
+            self.controller_cls, code=code, graph_data=graph_data
         )
         ctrl.main()
