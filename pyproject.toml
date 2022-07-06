@@ -24,46 +24,31 @@ exclude = ["executor/tests"]
 [tool.poetry.dependencies]
 python = "~3.10"
 networkg = { git = "https://github.com/Reed-CompBio/networkx.git", rev = "networkg-2.8.4r1" }
-numpy = { version = "^1.23.0", extras = ["sci", "full"], optional = true}
-scipy = { version = "^1.8.1", extras = ["sci", "full"], optional = true}
-matplotlib = { version = "^3.5.2", extras = ["sci", "full"], optional = true}
-pandas = { version = "^1.4.3", extras = ["sci", "full"], optional = true}
 
 
-[tool.poetry.dev-dependencies]
-pytest = { version = "^7.1.1", extras = ["dev", "full"], optional = true }
-black = { version = "^22.1.0", extras = ["dev", "full"], optional = true }
-codacy-coverage = { version = "^1.3.11", extras = ["dev", "full"], optional = true }
-pre-commit = { version = "^2.19.0", extras = ["dev", "full"], optional = true }
+[tool.poetry.group.sci]
+optional = true
 
-[tool.poetry.extras]
-sci = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "pandas",
-]
-dev = [
-    "pytest",
-    "black",
-    "codacy-coverage",
-    "pre-commit",
-]
-full = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "pandas",
+[tool.poetry.group.sci.dependencies]
+numpy = { version = "^1.23.0" }
+scipy = { version = "^1.8.1" }
+matplotlib = { version = "^3.5.2" }
+pandas = { version = "^1.4.3" }
 
-    "pytest",
-    "black",
-    "codacy-coverage",
-    "pre-commit",
-]
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = { version = "^7.1.1" }
+black = { version = "^22.1.0" }
+codacy-coverage = { version = "^1.3.11" }
+pre-commit = { version = "^2.19.0" }
+
 
 [tool.poetry.scripts]
 graphery_executor = "executor:main"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.1.0"]
 build-backend = "poetry.core.masonry.api"
