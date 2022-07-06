@@ -168,7 +168,7 @@ class _ModuleRestrict(LayerContext):
                     delattr(_sys.modules["os"], a)
             # ppl can dig up trashed objects with gc.get_objects()
             # noinspection PyUnresolvedReferences
-            import gc
+            import gc  # noqa: F401
 
             for a in dir(_sys.modules["gc"]):
                 delattr(_sys.modules["gc"], a)
@@ -406,6 +406,7 @@ class Controller(Generic[_T]):
         self._BUILTIN_IMPORT: Final = _builtins_getter("__import__")
 
         self._ALLOWED_STDLIB_MODULE_IMPORTS: Final = [
+            "__future__",
             "math",
             "random",
             "time",
@@ -984,6 +985,9 @@ class GraphController(Controller[List[MutableMapping]]):
         self._logger.debug("injected typing modules")
 
         # place trace
+        import executor.seeker as _seeker_cls
+
+        self._add_custom_module(_seeker_cls, "seeker")
         self._update_globals("tracer", self._tracer)
         self._logger.debug("collected `tracer` class")
 
