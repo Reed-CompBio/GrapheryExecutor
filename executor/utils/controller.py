@@ -31,6 +31,7 @@ from typing import (
 )
 from contextlib import redirect_stdout, redirect_stderr
 
+from .graphology_helper import import_from_graphology
 from .recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
 
@@ -848,7 +849,7 @@ class GraphController(Controller[List[MutableMapping]]):
         "_tracer",
     ]
 
-    _graph_builder = nx.cytoscape_graph
+    _graph_builder = import_from_graphology
 
     def __init__(
         self,

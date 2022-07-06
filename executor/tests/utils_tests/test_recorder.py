@@ -3,6 +3,9 @@ from __future__ import annotations
 from copy import deepcopy
 from textwrap import dedent
 
+import networkx as nx
+from networkx import Edge
+
 from .recorder_helper import RecorderEQ
 from .test_controller import make_test_controller_instance
 from executor.utils.controller import GraphController
@@ -80,7 +83,7 @@ class TestRecorder:
         # fmt: off
         target = RecorderEQ()\
             .start_init()\
-            .add_record().add_variable('i').back()\
+            .add_record().add_variable('i', type="Number", repr='10').back()\
             .exit_with()
         # fmt: on
 
@@ -92,10 +95,10 @@ class TestRecorder:
             @tracer('a', 'b')
             def test(a, b, c):
                 a = b * c
-                b = c * a 
+                b = c * a
                 c = a * b
                 return a, b
-            
+
             with tracer('i', 'j'):
                 i, j = test(5, 7, 11)
                 k = i ** 0.5
@@ -107,23 +110,32 @@ class TestRecorder:
             graph_data=self.default_graph_data,
         )
 
-        # fmt: off
-        target = RecorderEQ() \
-            .start_init()\
-            .add_record().back() \
-            .add_record().add_variable('test', 'a').add_variable('test', 'b').back() \
-            .add_record().add_variable('test', 'a').add_variable('test', 'b').back() \
-            .add_record().add_variable('test', 'a').add_variable('test', 'b').back() \
-            .add_record().back() \
-            .add_record()\
-                .add_variable('test', 'a')\
-                .add_variable('test', 'b')\
-                .add_variable('', 'i')\
-                .add_variable('', 'j')\
-                .back()\
-            .add_record().back() \
-            .exit_with()  # to handle with exit
-        # fmt: on
+        target = (
+            RecorderEQ()
+            .start_init()
+            .add_record_and_back()
+            .add_record()
+            .add_variable("test", "a", type="Number", repr="5")
+            .add_variable("test", "b", type="Number", repr="7")
+            .back()
+            .add_record()
+            .add_variable("test", "a", type="Number", repr="77")
+            .add_variable("test", "b", type="Number", repr="7")
+            .back()
+            .add_record()
+            .add_variable("test", "a", type="Number", repr="77")
+            .add_variable("test", "b", type="Number", repr="847")
+            .back()
+            .add_record_and_back()
+            .add_record()
+            .add_variable("test", "a", type="Number", repr="77")
+            .add_variable("test", "b", type="Number", repr="847")
+            .add_variable("", "i", type="Number", repr="77")
+            .add_variable("", "j", type="Number", repr="847")
+            .back()
+            .add_record_and_back()
+            .exit_with()
+        )  # to handle with exit
 
         target.check(ctrl.recorder.final_change_list)
 
@@ -136,7 +148,7 @@ class TestRecorder:
                     a = a ** a
                     b = b * a - c
                     return a * b + c
-                
+
                 with tracer('j', 'k'):
                     i = compute(2, 3, 5)
                     j = compute(7, 9, 10) * compute(3, 2, -1)
@@ -150,7 +162,7 @@ class TestRecorder:
                     a = a ** a
                     b = b * a - c
                     return a * b + c
-                
+
                 with tracer('j', 'k'):
                     i = compute(2, 3, 5)
                     j = compute(7, 9, 10) * compute(3, 2, -1)
@@ -167,13 +179,69 @@ class TestRecorder:
                 graph_data=self.default_graph_data,
             )
 
-            # fmt: off
-            target = RecorderEQ()\
-                .start_init()\
-                .add_record().add_access('i').back()\
-                .add_record().add_variable('', 'j').add_access(1).add_access(2).back()\
-                .add_record().add_variable('', 'j').add_variable('', 'k').back()\
+            target = (
+                RecorderEQ()
+                .start_init()
+                .add_record()
+                .add_variable("i", type="Number", repr="33")
+                .add_access(type="Number", repr="33")
+                .back()
+                .add_record()
+                .add_variable("", "j", type="Number", repr=f"{6103999420221 * 1484}")
+                .add_access(repr="6103999420221")
+                .add_access(repr="1484")
+                .back()
+                .add_record()
+                .add_variable("", "j")
+                .add_variable("", "k", type="Number", repr="4")
+                .back()
                 .exit_with()
-            # fmt: on
+            )
 
             target.check(ctrl.recorder.final_change_list)
+
+    def test_graph(self):
+        code = dedent(
+            """\
+            @tracer('node', 'edge')
+            def main() -> None:
+                for node in graph.nodes:
+                    graph.add_edge(node, node)
+                for edge in graph.edges:
+                    print(edge)
+
+            if __name__ == "__main__":
+                main()
+            """
+        )
+        g = nx.Graph()
+        node_num = 5
+        g.add_nodes_from(range(5))
+
+        ctrl = run_main(self.controller, code=code, graph_data=g)
+
+        target = RecorderEQ().start_init()
+        target.add_record()
+
+        for i in range(node_num):
+            # fmt: off
+            target.add_record()\
+                .add_variable("node", type="Node", repr=str(i))\
+                .back()\
+                .add_record_and_back()
+            # fmt: on
+
+        target.add_record(line=3)
+
+        for i in range(node_num):
+            # fmt: off
+            target.add_record()\
+                .add_variable('edge', type="Edge", repr=str(i))\
+                .back()\
+                .add_record()\
+                .add_stdout(Edge.wraps((1, 1)))
+            # fmt: on
+
+        target.add_record(line=5)
+
+        print(ctrl.recorder.final_change_list_json)

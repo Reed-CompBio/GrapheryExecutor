@@ -6,12 +6,25 @@ from typing import Mapping, Any, Callable, Sequence
 import networkx as nx
 
 
-__all__ = ["run_layout_fn", "export_to_graphology", "import_from_graphology"]
+__all__ = [
+    "get_graphology_key",
+    "apply_sizing",
+    "run_layout_fn",
+    "export_to_graphology",
+    "import_from_graphology",
+]
 
 _KEY_ATTR_NAME = "key"
 _SIZE_ATTR_NAME = "size"
 _DEFAULT_SIZE = 15
 _DEFAULT_LAYOUT_FN = nx.spring_layout
+
+
+def get_graphology_key(
+    graph: nx.Graph, identifier, key_field_name: str = _KEY_ATTR_NAME
+) -> str:
+    entity = graph.nodes[identifier]
+    return str(entity.get(key_field_name, None) or identifier)
 
 
 def run_layout_fn(
