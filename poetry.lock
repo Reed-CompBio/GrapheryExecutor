@@ -588,7 +588,7 @@ sci = ["numpy", "scipy", "matplotlib", "pandas"]
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.10"
-content-hash = "5230314e9706ef8a1d288e06669621f15af9c22eb56af8fc19b7b7262873ac6b"
+content-hash = "1001b25fac2207fd05a4207a640cbb12c48c8542f79354e22e6323454d695d86"
 
 [metadata.files]
 atomicwrites = [
