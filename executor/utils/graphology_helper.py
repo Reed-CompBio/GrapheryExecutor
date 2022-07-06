@@ -1,16 +1,35 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Any, Callable
+from typing import Mapping, Any, Callable, Sequence
 
 import networkx as nx
 
 
-__all__ = ["export_to_graphology"]
+__all__ = ["run_layout_fn", "export_to_graphology", "import_from_graphology"]
 
 _KEY_ATTR_NAME = "key"
+_SIZE_ATTR_NAME = "size"
 _DEFAULT_SIZE = 15
 _DEFAULT_LAYOUT_FN = nx.spring_layout
+
+
+def run_layout_fn(
+    graph: nx.Graph, layout_fn: Callable = _DEFAULT_LAYOUT_FN
+) -> nx.Graph:
+    layout = layout_fn(graph)
+    layout_dict = {node: {"x": x, "y": y} for node, (x, y) in layout.items()}
+    nx.set_node_attributes(graph, layout_dict)
+    return graph
+
+
+def apply_sizing(graph: nx.Graph, size: int = _DEFAULT_SIZE, nodes: Sequence = ()):
+    if not nodes:
+        nodes = graph.nodes
+
+    attr_dict = {node: size for node in nodes}
+
+    nx.set_node_attributes(graph, attr_dict, _SIZE_ATTR_NAME)
 
 
 def export_to_graphology(
@@ -35,20 +54,15 @@ def export_to_graphology(
     }
 
     if any(("x" not in attr or "y" not in attr) for attr in graph.nodes.values()):
-        layout = layout_fn(graph)
-        layout_dict = {node: {"x": x, "y": y} for node, (x, y) in layout.items()}
-        nx.set_node_attributes(graph, layout_dict)
+        run_layout_fn(graph, layout_fn)
 
     for node, attr in graph.nodes.items():  # type: Any, nx.NodeView[str, Any]
-        attr = attr.copy()
-
-        if "size" not in attr:
-            attr["size"] = _DEFAULT_SIZE
+        apply_sizing(graph, nodes=(node,))
 
         data["nodes"].append(
             {
                 "key": attr.get(_KEY_ATTR_NAME, None) or node,
-                "attributes": attr,
+                "attributes": attr.copy(),
             }
         )
 
@@ -113,11 +127,11 @@ def import_from_graphology(json_obj: str | Mapping) -> nx.Graph:
     edges = json_obj.get("edges", [])
     # not sure if this works or not
     for edge in edges:
-        is_undirected = edge["undirected"]
+        is_undirected = edge.get("undirected", None)
         graph.add_edge(
             edge["source"],
             edge["target"],
-            edge.get("key", None),
+            key=edge.get("key", None),
             **edge["attributes"],
             undirected=is_undirected,
         )
@@ -126,7 +140,7 @@ def import_from_graphology(json_obj: str | Mapping) -> nx.Graph:
             graph.add_edge(
                 edge["target"],
                 edge["source"],
-                edge.get("key", None),
+                key=edge.get("key", None),
                 **edge["attributes"],
                 undirected=is_undirected,
             )
