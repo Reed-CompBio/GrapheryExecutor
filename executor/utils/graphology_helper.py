@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Any
+from typing import Mapping, Any, Callable
 
 import networkx as nx
 
@@ -9,14 +9,18 @@ import networkx as nx
 __all__ = ["export_to_graphology"]
 
 _KEY_ATTR_NAME = "key"
-_DEFAULT_SIZE = 10
+_DEFAULT_SIZE = 15
+_DEFAULT_LAYOUT_FN = nx.spring_layout
 
 
-def export_to_graphology(graph: nx.Graph) -> Mapping:
+def export_to_graphology(
+    graph: nx.Graph, layout_fn: Callable = _DEFAULT_LAYOUT_FN
+) -> Mapping:
     """
     export networkx graph to graphology serialization format
     reference: https://graphology.github.io/serialization
     @param graph: networkx graph
+    @param layout_fn:
     @return:
     """
     data = {
@@ -30,6 +34,11 @@ def export_to_graphology(graph: nx.Graph) -> Mapping:
         "edges": [],
     }
 
+    if any(("x" not in attr or "y" not in attr) for attr in graph.nodes.values()):
+        layout = layout_fn(graph)
+        layout_dict = {node: {"x": x, "y": y} for node, (x, y) in layout.items()}
+        nx.set_node_attributes(graph, layout_dict)
+
     for node, attr in graph.nodes.items():  # type: Any, nx.NodeView[str, Any]
         attr = attr.copy()
 
@@ -39,7 +48,7 @@ def export_to_graphology(graph: nx.Graph) -> Mapping:
         data["nodes"].append(
             {
                 "key": attr.get(_KEY_ATTR_NAME, None) or node,
-                "attribute": attr,
+                "attributes": attr,
             }
         )
 
