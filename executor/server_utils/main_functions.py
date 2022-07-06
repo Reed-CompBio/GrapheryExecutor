@@ -173,7 +173,7 @@ class ExecutorWSGIServer(WSGIServer):
             )
 
         if not stdout:
-            self.logger.warn(f"got empty running result: {command}")
+            self.logger.warning(f"got empty running result: {command}")
             raise ExecutionError(
                 "Empty execution result. Error might have occurred in the execution.",
                 stderr.decode() if stderr else "Empty stderr output",

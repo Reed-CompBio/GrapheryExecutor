@@ -937,7 +937,9 @@ class GraphController(Controller[List[MutableMapping]]):
         if self._graph is None or not isinstance(self._graph, nx.Graph):
             from warnings import warn
 
-            warn("initialization of recorder requires proper graph")
+            warn(
+                f"initialization of recorder requires proper graph. the current graph is '{self._graph}'"
+            )
         self._recorder = _recorder_cls(
             graph=self._graph,
             stdout=self._stdout,
