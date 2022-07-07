@@ -674,7 +674,7 @@ class Controller(Generic[_T]):
 
     # ===== basic structures =====
 
-    def __call__(self, *args, **kwargs) -> _CTRL_SELF[_T]:
+    def __call__(self, *args, **kwargs) -> _CTRL_SELF:
         """
         init process caller
         intended to usage: `controller_instance().main()`
@@ -749,7 +749,7 @@ class Controller(Generic[_T]):
     # ===== basic structures end =====
 
     # ===== main fn =====
-    def init(self, *args, **kwargs) -> _CTRL_SELF[_T]:
+    def init(self, *args, **kwargs) -> _CTRL_SELF:
         """
         same as `__call__`, but probably looks nicer
         intended usage: `controller_instance.init().main()`
