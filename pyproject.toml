@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "graphery_executor"
-version = "3.2.5"
+version = "3.2.5r1"
 description = "The executor module for Graphery"
 authors = ["Larry Zeng <graphery@reed.edu>"]
 license = "MIT"
@@ -50,5 +50,5 @@ pre-commit = { version = "^2.19.0" }
 graphery_executor = "executor:main"
 
 [build-system]
-requires = ["poetry-core>=1.1.0"]
+requires = ["poetry-core>=1.1.0b2"]
 build-backend = "poetry.core.masonry.api"
