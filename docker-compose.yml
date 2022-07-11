@@ -10,7 +10,7 @@ services:
       GE_EXEC_MEM_OUT: ${GE_EXEC_MEM_OUT-100}
       GE_IS_LOCAL: ${GE_IS_LOCAL-False}
       GE_RAND_SEED: ${GE_RAND_SEED-0}
-      GE_INTPUT_LIST: ${GE_INTPUT_LIST-[]}
+      GE_INPUT_LIST: ${GE_INPUT_LIST-[]}
       GE_FLOAT_PRECISION: ${GE_FLOAT_PRECISION-4}
     build: .
     ports:
@@ -19,7 +19,7 @@ services:
       - NET_ADMIN
     deploy:
       restart_policy:
-        condition: ${GE_DOCKER_RESTART_COND-unless-stopped}
+        condition: ${GE_DOCKER_RESTART_COND-any}
         window: ${GE_DOCKER_RESTART_WINDOW-10}s
       resources:
         limits:

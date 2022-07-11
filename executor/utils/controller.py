@@ -31,6 +31,7 @@ from typing import (
 )
 from contextlib import redirect_stdout, redirect_stderr
 
+from .graphology_helper import import_from_graphology
 from .recorder import Recorder as _recorder_cls
 from ..seeker import tracer as _tracer_cls
 
@@ -673,7 +674,7 @@ class Controller(Generic[_T]):
 
     # ===== basic structures =====
 
-    def __call__(self, *args, **kwargs) -> _CTRL_SELF[_T]:
+    def __call__(self, *args, **kwargs) -> _CTRL_SELF:
         """
         init process caller
         intended to usage: `controller_instance().main()`
@@ -748,7 +749,7 @@ class Controller(Generic[_T]):
     # ===== basic structures end =====
 
     # ===== main fn =====
-    def init(self, *args, **kwargs) -> _CTRL_SELF[_T]:
+    def init(self, *args, **kwargs) -> _CTRL_SELF:
         """
         same as `__call__`, but probably looks nicer
         intended usage: `controller_instance.init().main()`
@@ -848,7 +849,7 @@ class GraphController(Controller[List[MutableMapping]]):
         "_tracer",
     ]
 
-    _graph_builder = nx.cytoscape_graph
+    _graph_builder = import_from_graphology
 
     def __init__(
         self,
@@ -937,7 +938,9 @@ class GraphController(Controller[List[MutableMapping]]):
         if self._graph is None or not isinstance(self._graph, nx.Graph):
             from warnings import warn
 
-            warn("initialization of recorder requires proper graph")
+            warn(
+                f"initialization of recorder requires proper graph. the current graph is '{self._graph}'"
+            )
         self._recorder = _recorder_cls(
             graph=self._graph,
             stdout=self._stdout,
