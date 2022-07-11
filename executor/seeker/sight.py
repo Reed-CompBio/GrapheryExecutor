@@ -103,7 +103,7 @@ def get_path_and_source_from_frame(
         for line in source[:2]:
             # File coding may be specified. Match pattern from PEP-263
             # (https://www.python.org/dev/peps/pep-0263/)
-            match = re.search(br"coding[:=]\s*([-\w.]+)", line)
+            match = re.search(rb"coding[:=]\s*([-\w.]+)", line)
             if match:
                 encoding = match.group(1).decode("ascii")
                 break
@@ -459,13 +459,18 @@ class Tracer:
         # Finished dealing with misplaced function definition. ################
 
         # when not returning, add a record for later use
-        if not (
-            event == "return" and line_no == self.recorder.get_last_record_line_number()
-        ):
-            self.recorder.add_record(line_no)
+        self.recorder.add_record(line_no)
 
         # capture stdout change
         self.recorder.add_stdout_change()
+        import sys
+
+        print(
+            event,
+            self.recorder.get_second_to_last_record_line_number(),
+            self.recorder.get_second_to_last_record()[self.recorder.STDOUT_HEADER],
+            file=sys.stderr,
+        )
 
         # Reporting newish and modified variables: ############################
         #                                                                     #

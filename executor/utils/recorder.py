@@ -17,7 +17,6 @@ from typing import (
     MutableMapping,
     Any,
     Dict,
-    Union,
 )
 
 from networkx import (
@@ -33,7 +32,7 @@ from networkx import (
     is_data_multi_edge,
     Graph,
 )
-from .cytoscape_helper import get_cytoscape_id
+from .graphology_helper import get_graphology_key
 from .logger import void_logger
 from ..settings import IDENTIFIER_SEPARATOR
 
@@ -42,6 +41,8 @@ __all__ = ["Recorder", "identifier_to_string"]
 
 
 def identifier_to_string(identifier: Sequence[str]) -> str:
+    if len(identifier) == 1:
+        return f"{IDENTIFIER_SEPARATOR}{identifier[0]}"
     return IDENTIFIER_SEPARATOR.join(identifier)
 
 
@@ -96,13 +97,18 @@ class Recorder:
         _ACCESSED_IDENTIFIER_STRING: _DEFAULT_COLOR_PALETTE[1],
     }
 
-    _GRAPH_OBJECT_MAPPING = {
+    _GRAPH_NODE_MAPPING = {
         is_node: Node.graphery_type_flag,
+    }
+
+    _GRAPH_EDGE_MAPPING = {
         is_edge: Edge.graphery_type_flag,
         is_data_edge: DataEdge.graphery_type_flag,
         is_multi_edge: MultiEdge.graphery_type_flag,
         is_data_multi_edge: DataMultiEdge.graphery_type_flag,
     }
+
+    _GRAPH_OBJECT_MAPPING = {**_GRAPH_NODE_MAPPING, **_GRAPH_EDGE_MAPPING}
 
     _SINGULAR_MAPPING = {
         Number: "Number",
@@ -138,9 +144,11 @@ class Recorder:
         object: _OBJECT_TYPE_STRING,
     }
 
-    INIT_TYPE_STRING = "init"
-    REFERENCE_TYPE_STRING = "reference"
+    INIT_TYPE_STRING = "Init"
+    REFERENCE_TYPE_STRING = "Ref"
 
+    _NODE_OBJECT_TYPES = set(_GRAPH_NODE_MAPPING.values())
+    _EDGE_OBJECT_TYPES = set(_GRAPH_EDGE_MAPPING.values())
     _GRAPH_OBJECT_TYPES = set(_GRAPH_OBJECT_MAPPING.values())
     _SINGULAR_TYPES = set(_SINGULAR_MAPPING.values())
     _LINEAR_CONTAINER_TYPES = set(_LINEAR_CONTAINER_MAPPING.values())
@@ -149,9 +157,9 @@ class Recorder:
     TYPE_HEADER = "type"
     COLOR_HEADER = "color"
     REPR_HEADER = "repr"
-    GRAPH_ID_HEADER = "id"
-    GRAPH_PROPERTY_HEADER = "properties"
-    PYTHON_ID_HEADER = "python_id"
+    GRAPH_PROPERTY_HEADER = "attributes"
+    GRAPH_PROPERTY_KEY_HEADER = "key"
+    PYTHON_ID_HEADER = "pythonId"
 
     LINE_HEADER = "line"
     VARIABLE_HEADER = "variables"
@@ -178,7 +186,7 @@ class Recorder:
         # since node and edges don't carry data anymore
         self._graph = graph
         self._stdout = stdout
-        self._stdout_cache = []
+        self._stdout_cache: str = ""
         self._float_precision = float_precision
 
     def assign_and_get_color(self, identifier_string: str) -> None:
@@ -187,6 +195,7 @@ class Recorder:
         :param identifier_string: the identifier string
         :return: the color
         """
+        # TODO: randomly get colors
         if identifier_string not in self._color_mapping:
             if len(self._color_mapping) < len(self._DEFAULT_COLOR_PALETTE):
                 color = self._DEFAULT_COLOR_PALETTE[len(self._color_mapping)]
@@ -396,6 +405,10 @@ class Recorder:
             memory_trace = set()
         var_id = id(variable_state)
 
+        # if the variable is already in the memory trace, then we have a cycle
+        # REF will be placed and no real value will be placed
+        # otherwise, we will add the variable to the memory trace, and we will
+        # need to find the real type of the variable
         if var_id in memory_trace:
             # leave a note on the object and then trace back
             variable_type: str = self.REFERENCE_TYPE_STRING
@@ -403,42 +416,47 @@ class Recorder:
             variable_type: str = self._search_type_string(variable_state)
             memory_trace.add(var_id)
 
+        # build variable info
         state_mapping: MutableMapping = {
             self.TYPE_HEADER: variable_type,
             self.PYTHON_ID_HEADER: var_id,
             self.COLOR_HEADER: self._color_mapping[var_ident_str],
         }
 
+        # gather the representation of the variable info recursively
         state_mapping[self.REPR_HEADER] = self.custom_repr(
             variable_state, state_mapping[self.TYPE_HEADER], memory_trace
         )
 
-        if state_mapping[self.TYPE_HEADER] in self._GRAPH_OBJECT_TYPES:
-            variable_state: Union[Node, Edge]
-            state_mapping[self.GRAPH_ID_HEADER] = get_cytoscape_id(
-                self._graph, variable_state, self.GRAPH_ID_HEADER
-            )
-            state_mapping[self.GRAPH_PROPERTY_HEADER] = deepcopy(
-                self._graph.nodes.get(variable_state, {})
-            )
+        # if the type is a graph object, then we need to add the graph info
+        if state_mapping[self.TYPE_HEADER] in self._NODE_OBJECT_TYPES:
+            variable_state: Node
+            # if the type is a node, then we need to add the node info
+            state_mapping[self.GRAPH_PROPERTY_HEADER] = {
+                **deepcopy(self._graph.nodes.get(variable_state, {})),
+                self.GRAPH_PROPERTY_KEY_HEADER: get_graphology_key(
+                    self._graph, variable_state, self.GRAPH_PROPERTY_KEY_HEADER
+                ),
+            }
+        elif state_mapping[self.TYPE_HEADER] in self._EDGE_OBJECT_TYPES:
+            variable_state: Edge
+            state_mapping[self.GRAPH_PROPERTY_HEADER] = {
+                **deepcopy(self._graph.edges[variable_state], {}),
+            }
 
         return state_mapping
 
-    def read_from_io(self) -> List[str] | None:
+    def read_from_io(self) -> str | None:
         """
         read from given stdout stream
         :return:
         """
-        if not self._stdout:
-            return None
         self._stdout.seek(0)
-        result = self._stdout.readlines()
+        result = self._stdout.read()
         if result != self._stdout_cache:
             # egh, black handles slices poorly
-            # TODO how about performance?
-            diff = result[len(self._stdout_cache) :]
             self._stdout_cache = result
-            return diff
+            return self._stdout_cache
         return None
 
     def add_stdout_change(self) -> None:
@@ -512,7 +530,7 @@ class Recorder:
                 }
             )
             if len(self._color_mapping) > len(self._DEFAULT_COLOR_MAPPING)
-            else None,
+            else {},
             self.ACCESS_HEADER: None,
             self.STDOUT_HEADER: None,
         }
