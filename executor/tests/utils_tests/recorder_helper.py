@@ -161,79 +161,6 @@ class Variable:
         return str(self)
 
 
-class _NotSet:
-    def __repr__(self):
-        return self.__str__()
-
-    def __str__(self):
-        return "not set"
-
-
-not_set = _NotSet()
-
-del _NotSet
-
-
-def is_not_set(value: Any) -> bool:
-    return value is not_set
-
-
-class Variable:
-    headers_to_compare = [
-        Recorder.TYPE_HEADER,
-        Recorder.REPR_HEADER,
-        Recorder.GRAPH_PROPERTY_HEADER,
-        Recorder.COLOR_HEADER,
-    ]
-
-    def __init__(self, is_access: bool = False, **kwargs):
-        self.is_access = is_access
-        self.identifier = kwargs.pop("identifier") if not self.is_access else not_set
-
-        for header in self.headers_to_compare:
-            setattr(self, header, kwargs.pop(header, not_set))
-
-    def check(self, other: Variable | Mapping, **kwargs) -> bool:
-        if is_not_set(other):
-            return False
-
-        if isinstance(other, Mapping):
-            other = Variable(**other, **kwargs)
-
-        if other.is_access ^ self.is_access:
-            return False
-
-        for header in self.headers_to_compare:
-            header_value = getattr(self, header)
-            if is_not_set(header_value):
-                continue
-
-            if header_value != getattr(other, header):
-                return False
-
-        return True
-
-    def __eq__(self, other):
-        if isinstance(other, Variable):
-            return other.identifier == self.identifier
-        elif isinstance(other, str):
-            return other == self.identifier
-        else:
-            return False
-
-    def __hash__(self):
-        return hash(self.identifier)
-
-    def __str__(self):
-        return (
-            f"{self.identifier} -> "
-            f"{{{' - '.join(str(getattr(self, header)) for header in self.headers_to_compare)}}}\n"
-        )
-
-    def __repr__(self):
-        return str(self)
-
-
 class Record:
     def __init__(
         self, record_eq: RecorderEQ, line: int = None, is_init: bool = False, **kwargs
@@ -405,9 +332,6 @@ class RecorderEQ:
 
     def add_record_and_back(self, line: int = None, **kwargs) -> RecorderEQ:
         return self.add_record(line, **kwargs).back()
-
-    def add_record_and_back(self, line: int = None) -> RecorderEQ:
-        return self.add_record(line).back()
 
     def exit_with(self) -> RecorderEQ:
         return self.add_record().back()
