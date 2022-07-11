@@ -469,6 +469,9 @@ class Recorder:
         """
         self.get_second_to_last_record()[self.STDOUT_HEADER] = self.read_from_io()
 
+    def add_stdout_change_when_returning(self):
+        self.get_last_record()[self.STDOUT_HEADER] = self.read_from_io()
+
     def add_variable_change_to_last_record(
         self, var_ident_str: str, variable_state: Any
     ) -> None:

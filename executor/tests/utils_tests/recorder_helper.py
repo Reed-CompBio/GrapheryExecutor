@@ -336,9 +336,6 @@ class RecorderEQ:
     def exit_with(self) -> RecorderEQ:
         return self.add_record().back()
 
-    def return_from(self) -> RecorderEQ:
-        return self.add_record().back()
-
     def start_init(self) -> RecorderEQ:
         return self.add_record(0, is_init=True).back()
 

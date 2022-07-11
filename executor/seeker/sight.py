@@ -459,10 +459,14 @@ class Tracer:
         # Finished dealing with misplaced function definition. ################
 
         # when not returning, add a record for later use
-        self.recorder.add_record(line_no)
-
-        # capture stdout change
-        self.recorder.add_stdout_change()
+        if not (
+            event == "return" and line_no == self.recorder.get_last_record_line_number()
+        ):
+            self.recorder.add_record(line_no)
+            # capture stdout change
+            self.recorder.add_stdout_change()
+        else:
+            self.recorder.add_stdout_change_when_returning()
 
         # Reporting newish and modified variables: ############################
         #                                                                     #

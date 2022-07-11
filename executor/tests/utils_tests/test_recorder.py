@@ -162,7 +162,6 @@ class TestRecorder:
             .add_variable("test", "b", type="Number", repr="847")
             .back()
             .add_record_and_back()
-            .return_from()
             .add_record()
             .add_variable("test", "a", type="Number", repr="77")
             .add_variable("test", "b", type="Number", repr="847")
@@ -297,6 +296,6 @@ class TestRecorder:
                 .add_record_and_back(stdout=str(Edge.wraps((j, j))))
             )
 
-        target.add_record_and_back().return_from()
+        target.add_record_and_back()
 
         target.check(ctrl.recorder.final_change_list)
