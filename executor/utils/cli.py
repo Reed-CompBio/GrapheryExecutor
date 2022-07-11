@@ -58,7 +58,13 @@ def _local_run(settings: DefaultVars) -> None:
     input_content = fileinput.input("-").readline()
     logger.debug("got input content from stdin: " f"{input_content}")
 
-    request_obj: Mapping = json.loads(input_content)
+    if input_content:
+        request_obj: Mapping = json.loads(input_content)
+        logger.debug(f"got request object: {request_obj}")
+    else:
+        raise ValueError(
+            "got empty input content from cli reading; please check your input data"
+        )
 
     code: str = request_obj[settings.v.REQUEST_DATA_CODE_NAME]
     logger.debug(f"parsed code {code}")

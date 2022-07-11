@@ -1,5 +1,5 @@
 # use python 3.10 base image
-FROM python:3.10.2-alpine
+FROM python:3.10-alpine
 
 # specify working directory
 WORKDIR /code
