@@ -451,6 +451,9 @@ class Recorder:
         read from given stdout stream
         :return:
         """
+        if self._stdout is None:
+            return None
+
         self._stdout.seek(0)
         result = self._stdout.read()
         if result != self._stdout_cache:

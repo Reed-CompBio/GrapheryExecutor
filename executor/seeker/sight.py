@@ -463,14 +463,6 @@ class Tracer:
 
         # capture stdout change
         self.recorder.add_stdout_change()
-        import sys
-
-        print(
-            event,
-            self.recorder.get_second_to_last_record_line_number(),
-            self.recorder.get_second_to_last_record()[self.recorder.STDOUT_HEADER],
-            file=sys.stderr,
-        )
 
         # Reporting newish and modified variables: ############################
         #                                                                     #
