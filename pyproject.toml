@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "graphery_executor"
-version = "3.2.7"
+version = "3.3.0"
 description = "The executor module for Graphery"
 authors = ["Larry Zeng <graphery@reed.edu>"]
 license = "MIT"
