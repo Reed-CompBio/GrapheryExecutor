@@ -165,11 +165,12 @@ class ExecutorWSGIServer(WSGIServer):
             self.logger.info(f"finished running {command} successfully")
         except Exception as e:
             self.logger.warn(f"running failed: {command}")
-            proc.kill()
             stdout, stderr = proc.communicate()
+            proc.kill()
             raise ExecutionError(
-                f"Error happened during execution subprocess. Error: {e}",
-                f"{stdout}\n{stderr}",
+                f"Error happened during execution subprocess. Error: {e}\n"
+                f"stdout: \n",
+                f"{stdout}\n" f"stderr: \n" f"{stderr}\n",
             )
 
         if not stdout:
