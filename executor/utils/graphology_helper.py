@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Any, Callable, Sequence
+from typing import Mapping, Any, Callable
 
 import networkx as nx
 
 
 __all__ = [
+    "DEFAULT_NODE_SIZE",
+    "DEFAULT_EDGE_SIZE",
     "get_graphology_key",
-    "apply_sizing",
     "run_layout_fn",
     "export_to_graphology",
     "import_from_graphology",
@@ -16,7 +17,9 @@ __all__ = [
 
 _KEY_ATTR_NAME = "key"
 _SIZE_ATTR_NAME = "size"
-_DEFAULT_SIZE = 15
+_LABEL_ATTR_NAME = "label"
+DEFAULT_NODE_SIZE = 15
+DEFAULT_EDGE_SIZE = 10
 _DEFAULT_LAYOUT_FN = nx.spring_layout
 
 
@@ -36,13 +39,12 @@ def run_layout_fn(
     return graph
 
 
-def apply_sizing(graph: nx.Graph, size: int = _DEFAULT_SIZE, nodes: Sequence = ()):
-    if not nodes:
-        nodes = graph.nodes
-
-    attr_dict = {node: size for node in nodes}
-
-    nx.set_node_attributes(graph, attr_dict, _SIZE_ATTR_NAME)
+def make_edge_label(s, t, k: int = None, is_directed: bool = False):
+    link_type = "->" if is_directed else "-"
+    if k is None:
+        return f"{s}{link_type}{t}"
+    else:
+        return f"{s}{link_type}{t} ({k})"
 
 
 def export_to_graphology(
@@ -69,13 +71,19 @@ def export_to_graphology(
     if any(("x" not in attr or "y" not in attr) for attr in graph.nodes.values()):
         run_layout_fn(graph, layout_fn)
 
-    for node, attr in graph.nodes.items():  # type: Any, nx.NodeView[str, Any]
-        apply_sizing(graph, nodes=(node,))
+    for node, attrs in graph.nodes.items():  # type: Any, nx.NodeView[str, Any]
+        node_key = attrs.get(_KEY_ATTR_NAME, None) or node
+        attrs.update(
+            {
+                _LABEL_ATTR_NAME: node_key,
+                _SIZE_ATTR_NAME: attrs.get(_SIZE_ATTR_NAME, None) or DEFAULT_NODE_SIZE,
+            }
+        )
 
         data["nodes"].append(
             {
-                "key": attr.get(_KEY_ATTR_NAME, None) or node,
-                "attributes": attr.copy(),
+                "key": node_key,
+                "attributes": attrs.copy(),
             }
         )
 
@@ -83,23 +91,36 @@ def export_to_graphology(
         graph: nx.MultiGraph
         for e in graph.edges(keys=True):
             s, t, k = e[0], e[1], e[2]
-            data["edges"].append(
+            label = make_edge_label(s, t, k, graph.is_directed())
+            attrs = graph.adj[s][t][k]
+            attrs.update(
                 {
-                    "key": k,
-                    "source": s,
-                    "target": t,
-                    "attributes": graph.adj[s][t][k].copy(),
+                    _LABEL_ATTR_NAME: label,
+                    _SIZE_ATTR_NAME: attrs.get(_SIZE_ATTR_NAME, None)
+                    or DEFAULT_NODE_SIZE,
                 }
+            )
+            data["edges"].append(
+                {"key": k, "source": s, "target": t, "attributes": attrs.copy()}
             )
     else:
         for e in graph.edges():
             s, t = e[0], e[1]
+            key = make_edge_label(s, t, graph.is_directed())
+            attrs = graph.adj[s][t]
+            attrs.update(
+                {
+                    _LABEL_ATTR_NAME: key,
+                    _SIZE_ATTR_NAME: attrs.get(_SIZE_ATTR_NAME, None)
+                    or DEFAULT_EDGE_SIZE,
+                }
+            )
             data["edges"].append(
                 {
-                    "key": f"{s}->{t}",  # optional I think
+                    "key": key,  # optional I think
                     "source": s,
                     "target": t,
-                    "attributes": graph.adj[s][t].copy(),
+                    "attributes": attrs.copy(),
                 }
             )
 

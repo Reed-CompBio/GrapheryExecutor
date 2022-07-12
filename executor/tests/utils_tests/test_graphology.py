@@ -7,7 +7,6 @@ from ...utils.graphology_helper import (
     export_to_graphology,
     run_layout_fn,
     import_from_graphology,
-    apply_sizing,
 )
 
 
@@ -37,7 +36,6 @@ def test_export_different_types_from_graphology(graph_type, target_attr):
 def test_undirected_graph_export():
     g = nx.path_graph(10)
     run_layout_fn(g)
-    apply_sizing(g)
 
     result = import_from_graphology(export_to_graphology(g))
 
