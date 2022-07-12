@@ -95,7 +95,9 @@ class Checker:
                 except AttributeError:
                     return False
 
-            if contained_value != real_value:
+            if isinstance(contained_value, Checker):
+                return contained_value.check(real_value)
+            elif contained_value != real_value:
                 return False
         return True
 

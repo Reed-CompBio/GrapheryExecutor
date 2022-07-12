@@ -290,7 +290,17 @@ class TestRecorder:
                     "main",
                     "edge",
                     type="Edge",
-                    repr=f"{Edge.wraps((j, j))}",
+                    repr=Checker(
+                        contains_equal={
+                            "source": Checker(
+                                contains_equal={"type": "Node", "repr": f"{j}"}
+                            ),
+                            "target": Checker(
+                                contains_equal={"type": "Node", "repr": f"{j}"}
+                            ),
+                            "is_directed": False,
+                        }
+                    ),
                 )
                 .back()
                 .add_record_and_back(stdout=str(Edge.wraps((j, j))))

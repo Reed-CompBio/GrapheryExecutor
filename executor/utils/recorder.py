@@ -210,7 +210,7 @@ class Recorder:
 
     def register_variable(self, identifier: Sequence[str]) -> str:
         """
-        a variable is identified by a identifier, which is
+        a variable is identified by an identifier, which is
         a tuple of two strings. The first strings is the
         name of the place, ie functions etc., in which the
         variable is created. The second string is the variable
@@ -258,7 +258,7 @@ class Recorder:
         """
 
         # this should not be a problem in official use, since the first line in the main function
-        # ie. `def main()`: has no variables.
+        # i.e. `def main()`: has no variables.
         return self._changes[-2] if len(self._changes) > 1 else self._changes[-1]
 
     def get_second_to_last_record_line_number(self) -> int:
@@ -346,15 +346,30 @@ class Recorder:
             )
         return temp
 
+    def _generate_edge_repr(
+        self, variable_state: Edge, memory_trace: Set
+    ) -> Dict[str, MutableMapping]:
+        return {
+            "source": self.process_variable_state(
+                self._ACCESSED_IDENTIFIER_STRING, variable_state[0], memory_trace
+            ),
+            "target": self.process_variable_state(
+                self._ACCESSED_IDENTIFIER_STRING, variable_state[1], memory_trace
+            ),
+            "is_directed": self._graph.is_directed() if self._graph else None,
+        }
+
     def custom_repr(
         self, variable_state: Any, variable_type: str, memory_trace: Set
     ) -> Any:
         if variable_type == self.REFERENCE_TYPE_STRING:
             # which should always be None
             repr_result = None
-        elif variable_type in self._GRAPH_OBJECT_TYPES:
+        elif variable_type in self._NODE_OBJECT_TYPES:
             # TODO use custom graph repr generator
             repr_result = self._generate_singular_repr(variable_state)
+        elif variable_type in self._EDGE_OBJECT_TYPES:
+            repr_result = self._generate_edge_repr(variable_state, memory_trace)
         elif (
             variable_type in self._SINGULAR_TYPES
             or variable_type == self._OBJECT_TYPE_STRING
@@ -491,8 +506,8 @@ class Recorder:
     ) -> None:
         """Add variable change to previous (second last if possible) record.
 
-        When the variable is created/changed in line a,
-        the tracer evaluate it in line a+1. So, this function
+        When the variable is created/changed in the line n,
+        the tracer evaluate it in line n+1. So, this function
         is created to deal with this offset
         @param var_ident_str:
         @param variable_state:
