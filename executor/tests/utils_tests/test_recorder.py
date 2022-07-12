@@ -6,7 +6,7 @@ from textwrap import dedent
 import networkx as nx
 from networkx import Edge
 
-from .recorder_helper import RecorderEQ, Checker
+from .recorder_helper import RecorderEQ, Checker, VariableAdder
 from .test_controller import make_test_controller_instance
 from executor.utils.controller import GraphController
 from ...utils.recorder import Recorder
@@ -307,5 +307,290 @@ class TestRecorder:
             )
 
         target.add_record_and_back()
+
+        target.check(ctrl.recorder.final_change_list)
+
+    def test_ref(self):
+        code = dedent(
+            """\
+            @tracer('a', 'b', 'c')
+            def main() -> None:
+                a = [1, 2, 3]
+                b = a
+                a.append(b)
+                c = [4, 5, 6]
+                b.append(c)
+                c.append(a)
+
+            if __name__ == "__main__":
+                main()
+        """
+        )
+
+        ctrl = run_main(
+            self.controller,
+            code=code,
+            graph_data=self.default_graph_data,
+        )
+
+        variable_adder = VariableAdder()
+
+        target = (
+            RecorderEQ()
+            .start_init()
+            .add_record_and_back(line=2)
+            .add_record()
+            .add_variables(
+                variable_adder.add_variable(
+                    "main",
+                    "a",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.add_variable(
+                    "main",
+                    "b",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.modify_variable(
+                    "main",
+                    "a",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                        ],
+                    ),
+                ).modify_variable(
+                    "main",
+                    "b",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.add_variable(
+                    "main",
+                    "c",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "4"}),
+                            Checker(contains_equal={"type": "Number", "repr": "5"}),
+                            Checker(contains_equal={"type": "Number", "repr": "6"}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.modify_variable(
+                    "main",
+                    "a",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                            Checker(contains_equal={"type": "List"}),
+                        ],
+                    ),
+                ).modify_variable(
+                    "main",
+                    "b",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                            Checker(contains_equal={"type": "List"}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.modify_variable(
+                    "main",
+                    "c",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "4"}),
+                            Checker(contains_equal={"type": "Number", "repr": "5"}),
+                            Checker(contains_equal={"type": "Number", "repr": "6"}),
+                            Checker(
+                                contains_equal={
+                                    "type": "List",
+                                    "repr": Checker(
+                                        sequence_is=[
+                                            Checker(),
+                                            Checker(),
+                                            Checker(),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Ref",
+                                                    "repr": None,
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Ref",
+                                                    "repr": None,
+                                                }
+                                            ),
+                                        ],
+                                    ),
+                                }
+                            ),
+                        ],
+                    ),
+                )
+                .modify_variable(
+                    "main",
+                    "a",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                            Checker(
+                                contains_equal={
+                                    "type": "List",
+                                    "repr": Checker(
+                                        is_type=list,
+                                        sequence_is=[
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "4",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "5",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "6",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Ref",
+                                                    "repr": None,
+                                                }
+                                            ),
+                                        ],
+                                    ),
+                                }
+                            ),
+                        ],
+                    ),
+                )
+                .modify_variable(
+                    "main",
+                    "b",
+                    type="List",
+                    repr=Checker(
+                        is_type=list,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Number", "repr": "2"}),
+                            Checker(contains_equal={"type": "Number", "repr": "3"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                            Checker(
+                                contains_equal={
+                                    "type": "List",
+                                    "repr": Checker(
+                                        is_type=list,
+                                        sequence_is=[
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "4",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "5",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Number",
+                                                    "repr": "6",
+                                                }
+                                            ),
+                                            Checker(
+                                                contains_equal={
+                                                    "type": "Ref",
+                                                    "repr": None,
+                                                }
+                                            ),
+                                        ],
+                                    ),
+                                }
+                            ),
+                        ],
+                    ),
+                )
+            )
+            .back()
+        )
 
         target.check(ctrl.recorder.final_change_list)

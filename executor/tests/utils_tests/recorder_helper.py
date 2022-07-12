@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Mapping, List, Any, Set, Sequence
+from copy import copy
+from typing import Mapping, List, Any, Set, Sequence, Type, Iterable, Dict
 
 from executor.utils.recorder import Recorder, identifier_to_string
 import pprint
@@ -54,13 +55,32 @@ class Checker:
         contains: Sequence[Any] = not_set,
         contains_any: Sequence[Any] = not_set,
         contains_equal: Mapping[Any, Any] = not_set,
+        is_type: Type = not_set,
+        sequence_length: int = not_set,
+        sequence_is: Sequence[Any] = not_set,
+        has_properties: Iterable[str] = not_set,
+        properties_equal: Mapping[str, Any] = not_set,
     ):
         self.check_list = {
             "equals": equals,
             "contains": contains,
             "contains_any": contains_any,
             "contains_equal": contains_equal,
+            "is_type": is_type,
+            "sequence_length": sequence_length,
+            "sequence_is": sequence_is,
+            "has_properties": has_properties,
+            "properties_equal": properties_equal,
         }
+
+    def __str__(self):
+
+        return pprint.pformat(
+            {k: v for k, v in self.check_list.items() if not is_not_set(v)}
+        )
+
+    def __repr__(self):
+        return self.__str__()
 
     def check(self, other):
         for name, value in self.check_list.items():
@@ -71,16 +91,16 @@ class Checker:
                 return False
         return True
 
-    def _equals(self, other):
+    def _equals(self, other, *args, **kwargs):
         return other == self.check_list["equals"]
 
-    def _contains(self, other):
+    def _contains(self, other, *args, **kwargs):
         return all(contained in other for contained in self.check_list["contains"])
 
-    def _contains_any(self, other):
+    def _contains_any(self, other, *args, **kwargs):
         return any(contained in other for contained in self.check_list["contains_any"])
 
-    def _contains_equal(self, other):
+    def _contains_equal(self, other, *args, **kwargs):
         for contained_name, contained_value in self.check_list[
             "contains_equal"
         ].items():
@@ -100,6 +120,67 @@ class Checker:
             elif contained_value != real_value:
                 return False
         return True
+
+    def _is_type(self, other, *args, **kwargs):
+        return isinstance(other, self.check_list.get("is_type"))
+
+    def _sequence_length(self, other, *args, **kwargs):
+        return len(other) == self.check_list["sequence_length"]
+
+    def _sequence_is(self, other, *args, **kwargs):
+        target_sequence = self.check_list["sequence_is"]
+        if len(other) != len(target_sequence):
+            return False
+
+        for target, actual in zip(target_sequence, other):
+            if isinstance(target, Checker):
+                if not target.check(actual):
+                    return False
+            else:
+                if target != actual:
+                    return False
+
+        return True
+
+    def _has_properties(self, other, *args, **kwargs):
+        return all(hasattr(other, prop) for prop in self.check_list["has_properties"])
+
+    def _properties_equal(self, other, *args, **kwargs):
+        for prop, target_value in self.check_list["properties_equal"].items():
+            actual_value = getattr(other, prop)
+            if isinstance(target_value, Checker):
+                if not target_value.check(actual_value):
+                    return False
+            elif target_value != getattr(other, actual_value):
+                return False
+        return True
+
+
+class VariableAdder:
+    def __init__(self, **kwargs):
+        self._variables: Dict[str, Variable] = {**kwargs}
+
+    @property
+    def variables(self):
+        return [*self._variables.values()]
+
+    def add_variable(self, *args, **kwargs):
+        var_identifier = identifier_to_string(args)
+        assert var_identifier not in self._variables
+        self._variables[var_identifier] = Variable(
+            identifier=var_identifier,
+            **kwargs,
+        )
+        return self
+
+    def modify_variable(self, *args, **kwargs):
+        var_identifier = identifier_to_string(args)
+        assert var_identifier in self._variables
+        self._variables[var_identifier] = Variable(
+            identifier=var_identifier,
+            **kwargs,
+        )
+        return self
 
 
 class Variable:
@@ -187,6 +268,12 @@ class Record:
         )
         return self
 
+    def add_variables(self, var_adder: VariableAdder) -> Record:
+        if self.variables is None:
+            self.variables = set()
+        self.variables.update(copy(var_adder.variables))
+        return self
+
     def add_access(self, **kwargs) -> Record:
         if self.accesses is None:
             self.accesses = []
@@ -241,14 +328,15 @@ class Record:
         if actual_vars is not None:
             actual_vars: Mapping
             if len(actual_vars) != len(self.variables):
-                if len(
+                not_init_var_num = len(
                     [
                         var
                         for var in actual_vars.values()
-                        if var[Recorder.TYPE_HEADER] == "Init"
+                        if var[Recorder.TYPE_HEADER] != "Init"
                     ]
-                ) != len(self.variables):
-                    return f"expected {len(self.variables)} variables but got {len(actual_vars)}"
+                )
+                if not_init_var_num != len(self.variables):
+                    return f"expecting {len(self.variables)} variables but got {len(actual_vars)}"
 
             for variable in self.variables:
                 if not variable.check(
@@ -360,7 +448,7 @@ class RecorderEQ:
                         "expecting:\n"
                         f"{target}\n"
                         f"actual: \n"
-                        f"{record}\n"
+                        f"{pprint.pformat(record)}\n"
                         f"whole list: \n"
                         f"{pprint.pformat(records)}"
                     )
