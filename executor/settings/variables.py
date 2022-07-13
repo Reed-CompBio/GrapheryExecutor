@@ -64,11 +64,10 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 class VarClass(Protocol):
     __slots__: Sequence = ()
 
-    _vars: ClassVar[Mapping[str, ...]]
+    _vars: ClassVar[Mapping[str, ...]] | Dict[str, ...]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
-    _vars: Dict[str, ...]
     v: _VarGetter
 
     @property
@@ -108,26 +107,43 @@ class _DefaultVarsFields(Protocol):
 
     __slots__: Sequence = ()
 
-    SERVER_URL: ClassVar[str]
-    SERVER_PORT: ClassVar[str]
-    ALLOW_OTHER_ORIGIN: ClassVar[str]
-    ACCEPTED_ORIGINS: ClassVar[str]
+    SERVER_URL: ClassVar[str] | str
+    SERVER_PORT: ClassVar[str] | int
+    ALLOW_OTHER_ORIGIN: ClassVar[str] | bool
+    ACCEPTED_ORIGINS: ClassVar[str] | List[str]
 
-    EXEC_TIME_OUT: ClassVar[str]
-    EXEC_MEM_OUT: ClassVar[str]
-    IS_LOCAL: ClassVar[str]
-    RAND_SEED: ClassVar[str]
-    FLOAT_PRECISION: ClassVar[str]
-    INPUT_LIST: ClassVar[str]
-    LOGGER: ClassVar[str]
+    EXEC_TIME_OUT: ClassVar[str] | int
+    EXEC_MEM_OUT: ClassVar[str] | int
+    IS_LOCAL: ClassVar[str] | bool
+    RAND_SEED: ClassVar[str] | int
+    FLOAT_PRECISION: ClassVar[str] | int
+    INPUT_LIST: ClassVar[str] | List[str]
+    LOGGER: ClassVar[str] | Logger
 
-    REQUEST_DATA_CODE_NAME: ClassVar[str]
-    REQUEST_DATA_GRAPH_NAME: ClassVar[str]
-    REQUEST_DATA_VERSION_NAME: ClassVar[str]
-    REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
+    REQUEST_DATA_CODE_NAME: ClassVar[str] | str
+    REQUEST_DATA_GRAPH_NAME: ClassVar[str] | str
+    REQUEST_DATA_VERSION_NAME: ClassVar[str] | str
+    REQUEST_DATA_OPTIONS_NAME: ClassVar[str] | str
 
 
 class _VarGetter(_DefaultVarsFields):
+    SERVER_URL: str
+    SERVER_PORT: int
+    ALLOW_OTHER_ORIGIN: bool
+    ACCEPTED_ORIGINS: List[str]
+
+    EXEC_TIME_OUT: int
+    EXEC_MEM_OUT: int
+    IS_LOCAL: bool
+    RAND_SEED: int
+    FLOAT_PRECISION: int
+    INPUT_LIST: List[str]
+    LOGGER: Logger
+
+    REQUEST_DATA_CODE_NAME: str
+    REQUEST_DATA_GRAPH_NAME: str
+    REQUEST_DATA_VERSION_NAME: str
+    REQUEST_DATA_OPTIONS_NAME: str
     """
     This is a proxy of getting Vars from Var Settings
     """
