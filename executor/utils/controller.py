@@ -208,7 +208,7 @@ class ControllerResultAnnouncer:
         self,
         exception: Exception,
         trace: str = None,
-        error_code: ErrorCode = ErrorCode.CTRL_ERROR_CODE,
+        error_code: ErrorCode | int = ErrorCode.CTRL_ERROR_CODE,
     ) -> NoReturn:
         from traceback import format_exc
 
@@ -275,7 +275,7 @@ class _RandomContext(LayerContext):
         self._ctrl.logger.debug(f"set random seed to {self._ctrl.rand_seed}")
 
     def exit(self) -> None:
-        random.seed()
+        random.seed(None)
         self._ctrl.logger.debug("reset random seed")
 
 
@@ -470,7 +470,7 @@ class Controller(Generic[_T]):
                     ) and ele.__package__.startswith("networkx"):
                         self._sanitize_module(ele)
                 except ModuleNotFoundError:
-                    self._logger.exception(
+                    self._logger.warning(
                         f"failed to sanitize module {ele} due to import error within {ele}"
                     )
 
@@ -501,7 +501,10 @@ class Controller(Generic[_T]):
             ):
                 mod = self._BUILTIN_IMPORT(*args)
             else:
-                raise ImportError(f"{importing_name} not supported.")
+                if self.is_local:
+                    raise ImportError(f"{importing_name} not supported.")
+                else:
+                    mod = self._BUILTIN_IMPORT(*args)
 
             return self._sanitize_module(mod)
 
@@ -566,7 +569,7 @@ class Controller(Generic[_T]):
                 _user_builtins[k] = self._create_open()
             elif k in self._BANNED_BUILTINS and not self._is_local:
                 _user_builtins[k] = self._create_banned_builtins(k)
-            elif k == "__import__" and not self._is_local:
+            elif k == "__import__":
                 _user_builtins[k] = self._create_restrict_import()
             else:
                 if k == "raw_input":

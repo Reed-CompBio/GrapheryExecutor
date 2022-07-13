@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 import traceback
 from socketserver import BaseRequestHandler
 from typing import Mapping, Callable, List
@@ -150,6 +151,7 @@ class ExecutorWSGIServer(WSGIServer):
 
     def execute(self, config_bytes: bytes) -> List[Mapping]:
         command = self._subprocess_command
+        start_time = time.process_time()
         self.logger.debug(f"opening subprocess with command {command}")
         proc = subprocess.Popen(
             command,
@@ -164,7 +166,7 @@ class ExecutorWSGIServer(WSGIServer):
             )
             self.logger.info(f"finished running {command} successfully")
         except Exception as e:
-            self.logger.warn(f"running failed: {command}")
+            self.logger.warning(f"running failed: {command}")
             stdout, stderr = proc.communicate()
             proc.kill()
             raise ExecutionError(
@@ -172,6 +174,9 @@ class ExecutorWSGIServer(WSGIServer):
                 f"stdout: \n",
                 f"{stdout}\n" f"stderr: \n" f"{stderr}\n",
             )
+        finally:
+            end_time = time.process_time()
+            self.logger.info(f"execution uses {end_time - start_time} seconds")
 
         if not stdout:
             self.logger.warning(f"got empty running result: {command}")

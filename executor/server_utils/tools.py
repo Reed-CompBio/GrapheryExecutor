@@ -57,7 +57,7 @@ class ServerResultFormatter:
         if not self._error_msg_valid(error_msg):
             raise ValueError("error message malformed")
 
-        self._logger.info("added error: \n" f"{error_msg}")
+        self._logger.warning("added error: \n" f"{error_msg}")
 
         self._errors.append(error_msg)
         return error_msg
@@ -70,7 +70,7 @@ class ServerResultFormatter:
         if not self._info_msg_valid(info_msg):
             raise ValueError("value message malformed")
 
-        self._logger.info("added info: \n" f"{info_msg}")
+        self._logger.debug("added info: \n" f"{info_msg}")
 
         self._info.update(info_msg)
         return info_msg
