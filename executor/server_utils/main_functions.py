@@ -64,7 +64,8 @@ class ExecutorWSGIServer(WSGIServer):
 
         if not allow_other_origin and accepted_origin.count(origin) == 0:
             formatter.add_error(
-                message=f"The ORIGIN, {origin}, is not accepted.", traceback=None
+                message=f"The ORIGIN, {origin}, is not accepted.",
+                traceback="No traceback",
             )
         else:
             try:
@@ -152,6 +153,8 @@ class ExecutorWSGIServer(WSGIServer):
     def execute(self, config_bytes: bytes) -> List[Mapping]:
         command = self._subprocess_command
         start_time = time.process_time()
+        timeout = self.settings[self.settings.EXEC_TIME_OUT]
+        self.logger.info(f"start execution with timeout: {timeout}")
         self.logger.debug(f"opening subprocess with command {command}")
         proc = subprocess.Popen(
             command,
@@ -162,7 +165,7 @@ class ExecutorWSGIServer(WSGIServer):
         try:
             stdout, stderr = proc.communicate(
                 config_bytes,
-                timeout=self.settings[self.settings.EXEC_TIME_OUT],
+                timeout=timeout,
             )
             self.logger.info(f"finished running {command} successfully")
         except Exception as e:

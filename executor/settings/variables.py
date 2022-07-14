@@ -15,6 +15,7 @@ from typing import (
     Final,
     Sequence,
     List,
+    Any,
 )
 
 __all__ = [
@@ -64,7 +65,7 @@ SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 class VarClass(Protocol):
     __slots__: Sequence = ()
 
-    _vars: ClassVar[Mapping[str, ...]] | Dict[str, ...]
+    _vars: ClassVar[Mapping[str, Any]] | Dict[str, Any]
     server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
     general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
 
@@ -107,26 +108,26 @@ class _DefaultVarsFields(Protocol):
 
     __slots__: Sequence = ()
 
-    SERVER_URL: ClassVar[str] | str
-    SERVER_PORT: ClassVar[str] | int
-    ALLOW_OTHER_ORIGIN: ClassVar[str] | bool
-    ACCEPTED_ORIGINS: ClassVar[str] | List[str]
+    SERVER_URL: ClassVar[str]
+    SERVER_PORT: ClassVar[str]
+    ALLOW_OTHER_ORIGIN: ClassVar[str]
+    ACCEPTED_ORIGINS: ClassVar[str]
 
-    EXEC_TIME_OUT: ClassVar[str] | int
-    EXEC_MEM_OUT: ClassVar[str] | int
-    IS_LOCAL: ClassVar[str] | bool
-    RAND_SEED: ClassVar[str] | int
-    FLOAT_PRECISION: ClassVar[str] | int
-    INPUT_LIST: ClassVar[str] | List[str]
-    LOGGER: ClassVar[str] | Logger
+    EXEC_TIME_OUT: ClassVar[str]
+    EXEC_MEM_OUT: ClassVar[str]
+    IS_LOCAL: ClassVar[str]
+    RAND_SEED: ClassVar[str]
+    FLOAT_PRECISION: ClassVar[str]
+    INPUT_LIST: ClassVar[str]
+    LOGGER: ClassVar[str]
 
-    REQUEST_DATA_CODE_NAME: ClassVar[str] | str
-    REQUEST_DATA_GRAPH_NAME: ClassVar[str] | str
-    REQUEST_DATA_VERSION_NAME: ClassVar[str] | str
-    REQUEST_DATA_OPTIONS_NAME: ClassVar[str] | str
+    REQUEST_DATA_CODE_NAME: ClassVar[str]
+    REQUEST_DATA_GRAPH_NAME: ClassVar[str]
+    REQUEST_DATA_VERSION_NAME: ClassVar[str]
+    REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
 
 
-class _VarGetter(_DefaultVarsFields):
+class _VarGetter:
     SERVER_URL: str
     SERVER_PORT: int
     ALLOW_OTHER_ORIGIN: bool

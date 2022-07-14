@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+from collections import UserList, UserDict
 from copy import copy, deepcopy
 from io import StringIO
 from logging import Logger
@@ -17,6 +18,7 @@ from typing import (
     MutableMapping,
     Any,
     Dict,
+    NamedTuple,
 )
 
 from networkx import (
@@ -118,15 +120,19 @@ class Recorder:
 
     _LINEAR_CONTAINER_MAPPING = {
         List: "List",
+        UserList: "UserList",
         Tuple: "Tuple",
+        NamedTuple: "NamedTuple",
         Deque: "Deque",
         Set: "Set",  # which includes Set, set, KeyView(dict_keys), ValueView(dict_values), ItemView(dict_items),
         # frozenset, MutableSet
         # ElementSet: 'ElementSet', # removed in new api
         Sequence: "Sequence",  # which includes tuple, str, range, memoryview, MutableSequence, list, bytearray
+        # Generator: "Generator",  # make a new generator wrapper?
     }
 
     _PAIR_CONTAINER_MAPPING = {
+        UserDict: "UserDict",
         Counter: "Counter",
         Mapping: "Mapping",  # which includes mappingproxy (not sure what that is), MutableMapping, dict
     }
