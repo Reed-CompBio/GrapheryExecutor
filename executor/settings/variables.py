@@ -369,7 +369,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
                 og_type = parse_int
 
-            elif og_type is Logger:
+            elif issubclass(og_type, Logger):
                 # if the type of the original is Logger, get the logger from the string
                 og_type = AVAILABLE_LOGGERS.get
             elif og_type == NoneType:

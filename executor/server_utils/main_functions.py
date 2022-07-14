@@ -210,15 +210,15 @@ def run_server(settings: DefaultVars) -> None:
     port = settings.v.SERVER_PORT
     logger = settings.v.LOGGER
 
+    logger.info("Settings: ")
+    for k, v in settings.vars.items():
+        logger.info("{: <30}: {: <10}".format(k, str(v)))
+    logger.info(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
+    logger.info(f"Ready for Python code on {host}:{port} ...")
+
     with ExecutorWSGIServer(
         server_address=(host, port), handler_cls=WSGIRequestHandler, settings=settings
     ) as httpd:
-        # ========== settings log
-        logger.info(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
-        logger.info(f"Ready for Python code on {host}:{port} ...")
-        logger.info("Settings: ")
-        for k, v in httpd.settings.vars.items():
-            logger.info("{: <27}: {: <10}".format(k, str(v)))
-        # ========== settings log end
+        logger.info("Server created...")
         logger.info("Starting server...")
         httpd.serve_forever()

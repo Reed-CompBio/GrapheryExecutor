@@ -18,7 +18,6 @@ from typing import (
     MutableMapping,
     Any,
     Dict,
-    NamedTuple,
 )
 
 from networkx import (
@@ -122,7 +121,6 @@ class Recorder:
         List: "List",
         UserList: "UserList",
         Tuple: "Tuple",
-        NamedTuple: "NamedTuple",
         Deque: "Deque",
         Set: "Set",  # which includes Set, set, KeyView(dict_keys), ValueView(dict_values), ItemView(dict_items),
         # frozenset, MutableSet
