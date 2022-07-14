@@ -56,11 +56,9 @@ def _local_run(settings: DefaultVars) -> None:
     import json
 
     input_content = fileinput.input("-").readline()
-    logger.debug("got input content from stdin: " f"{input_content}")
 
     if input_content:
         request_obj: Mapping = json.loads(input_content)
-        logger.debug(f"got request object: {request_obj}")
     else:
         raise ValueError(
             "got empty input content from cli reading; please check your input data"
@@ -75,7 +73,9 @@ def _local_run(settings: DefaultVars) -> None:
     target_version: str = request_obj.get(settings.v.REQUEST_DATA_VERSION_NAME, "null")
     logger.debug(f"parsed version {target_version}")
 
-    options: Dict[str, Any] = request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {})
+    options: Dict[str, Any] = (
+        request_obj.get(settings.v.REQUEST_DATA_OPTIONS_NAME, {}) or {}
+    )
     logger.debug(f"parsed options {options}")
 
     options = {k.upper(): v for k, v in options.items()}

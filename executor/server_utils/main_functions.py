@@ -153,7 +153,11 @@ class ExecutorWSGIServer(WSGIServer):
     def execute(self, config_bytes: bytes) -> List[Mapping]:
         command = self._subprocess_command
         start_time = time.process_time()
-        timeout = self.settings[self.settings.EXEC_TIME_OUT]
+        timeout = (
+            self.settings[self.settings.EXEC_TIME_OUT]
+            if self.settings.IS_LOCAL
+            else None
+        )
         self.logger.info(f"start execution with timeout: {timeout}")
         self.logger.debug(f"opening subprocess with command {command}")
         proc = subprocess.Popen(
