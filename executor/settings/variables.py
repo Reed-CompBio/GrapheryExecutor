@@ -40,7 +40,7 @@ _ENV_PREFIX: Final[str] = "GE_"
 
 # Custom Variables
 PROG_NAME: Final[str] = "graphery_executor"
-SERVER_VERSION: Final[str] = "3.3.3"
+SERVER_VERSION: Final[str] = "3.3.4"
 IDENTIFIER_SEPARATOR: Final[str] = "\u200b@"
 GRAPH_INJECTION_NAME = "graph"
 NX_GRAPH_INJECTION_NAME = "g_graph"
