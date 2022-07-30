@@ -5,21 +5,9 @@ import json
 from logging import Logger
 from os import getenv as _getenv
 from types import NoneType
-from typing import (
-    TypeVar,
-    Protocol,
-    ClassVar,
-    Mapping,
-    Tuple,
-    Dict,
-    Final,
-    Sequence,
-    List,
-    Any,
-)
+from typing import ClassVar, Mapping, Final, List, cast
 
 __all__ = [
-    "VarClass",
     "DefaultVars",
     "PROG_NAME",
     "SERVER_VERSION",
@@ -33,6 +21,7 @@ __all__ = [
     "SHELL_LOCAL_PARSER_NAME",
 ]
 
+from executor.settings.types import VarClass, VarDict, VarFieldNames
 from executor.utils.logger import AVAILABLE_LOGGERS, shell_info_logger
 
 _ENV_PREFIX: Final[str] = "GE_"
@@ -61,70 +50,12 @@ SHELL_SERVER_PARSER_NAME: Final[str] = "server"
 SHELL_LOCAL_PARSER_NAME: Final[str] = "local"
 
 
-# Shell Variables
-class VarClass(Protocol):
-    __slots__: Sequence = ()
-
-    _vars: ClassVar[Mapping[str, Any]] | Dict[str, Any]
-    server_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
-    general_shell_var: ClassVar[Dict[str, Tuple[Tuple, Mapping]]]
-
-    v: _VarGetter
-
-    @property
-    def vars(self) -> Mapping[str, ...]:
-        raise NotImplementedError
-
-    def __getitem__(self, item: str):
-        ...
-
-    def read_from_env(self, *args, use_default: bool = False) -> None:
-        ...
-
-    @classmethod
-    def get_var_arg_name(cls, var_field: str) -> str:
-        ...
-
-    @classmethod
-    def __class_getitem__(cls, item):
-        ...
-
-
-_T = TypeVar("_T", bound=VarClass)
-
-
 class ControllerOptionNames:
     LOGGER: Final[str] = "logger"
     CUSTOM_NAMESPACE: Final[str] = "custom_ns"
     STDOUT: Final[str] = "stdout"
     STDERR: Final[str] = "stderr"
     ANNOUNCER: Final[str] = "announcer"
-
-
-class _DefaultVarsFields(Protocol):
-    """
-    To be used in intelli scenes
-    """
-
-    __slots__: Sequence = ()
-
-    SERVER_URL: ClassVar[str]
-    SERVER_PORT: ClassVar[str]
-    ALLOW_OTHER_ORIGIN: ClassVar[str]
-    ACCEPTED_ORIGINS: ClassVar[str]
-
-    EXEC_TIME_OUT: ClassVar[str]
-    EXEC_MEM_OUT: ClassVar[str]
-    IS_LOCAL: ClassVar[str]
-    RAND_SEED: ClassVar[str]
-    FLOAT_PRECISION: ClassVar[str]
-    INPUT_LIST: ClassVar[str]
-    LOGGER: ClassVar[str]
-
-    REQUEST_DATA_CODE_NAME: ClassVar[str]
-    REQUEST_DATA_GRAPH_NAME: ClassVar[str]
-    REQUEST_DATA_VERSION_NAME: ClassVar[str]
-    REQUEST_DATA_OPTIONS_NAME: ClassVar[str]
 
 
 class _VarGetter:
@@ -185,7 +116,7 @@ def _parse_str_list(string: str) -> List[str]:
         return string.split("\n")
 
 
-class DefaultVars(_DefaultVarsFields, VarClass):
+class DefaultVars(VarFieldNames, VarClass):
     __slots__ = ["_vars", "v"]
 
     SERVER_URL = "SERVER_URL"
@@ -206,7 +137,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     REQUEST_DATA_VERSION_NAME = "REQUEST_DATA_VERSION_NAME"
     REQUEST_DATA_OPTIONS_NAME = "REQUEST_DATA_OPTIONS_NAME"
 
-    _default_vars = {
+    _default_vars: ClassVar[VarDict] = {
         SERVER_URL: "127.0.0.1",
         SERVER_PORT: 7590,
         ALLOW_OTHER_ORIGIN: True,
@@ -309,14 +240,14 @@ class DefaultVars(_DefaultVarsFields, VarClass):
     }
 
     def __init__(self, **kwargs):
-        self._vars: Dict = {**self._default_vars, **kwargs}
+        self._vars: VarDict = cast(VarDict, {**self._default_vars, **kwargs})
         self.read_from_env(all_args=True)
 
         # the proxy object to enable "settings.v.LOGGER"
         self.v: _VarGetter = _VarGetter(self)
 
     def __getitem__(self, item: str):
-        return self._vars[item]
+        return self._vars[item]  # type: ignore
 
     @classmethod
     def make_shell_env_name(cls, name: str) -> str:
@@ -340,7 +271,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
         for env_name in args:
             shell_env_name = self.make_shell_env_name(env_name)
-            original = self._vars[env_name]
+            original = self._vars[env_name]  # type: ignore
             # type conversions from str to the proper type
             og_type = type(original)
             if og_type is list:
@@ -379,7 +310,7 @@ class DefaultVars(_DefaultVarsFields, VarClass):
 
             from_env = _getenv(shell_env_name, None)
             if from_env is not None:
-                self._vars[env_name] = og_type(from_env)
+                self._vars[env_name] = og_type(from_env)  # type: ignore
 
     @classmethod
     def get_var_arg_name(cls, var_field: str) -> str:
@@ -430,10 +361,10 @@ class DefaultVars(_DefaultVarsFields, VarClass):
         :param item: the variable name (e.g. cls.INPUT_LIST)
         :return: the default value for that variable
         """
-        return cls._default_vars[item]
+        return cls._default_vars[item]  # type: ignore
 
     @property
-    def vars(self) -> Mapping[str, ...]:
+    def vars(self) -> VarDict:
         """
         Get the variable storage dictionary
         :return:
