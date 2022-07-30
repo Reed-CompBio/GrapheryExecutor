@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from textwrap import dedent
+from typing import List
 
 import networkx as nx
 from networkx import Edge
@@ -591,6 +592,84 @@ class TestRecorder:
                 )
             )
             .back()
+        )
+
+        target.check(ctrl.recorder.final_change_list)
+
+    def test_graph_and_ref(self):
+        code = dedent(
+            """\
+        from __future__ import annotations
+
+        import networkx as nx
+
+        graph: nx.Graph
+
+        @tracer('node_list', 'node', 'ref')
+        def main() -> None:
+            node_list = [*graph.nodes]
+            node =  node_list[0]
+            ref = [1, node]
+            ref.append(ref)
+            print(ref)
+
+        if __name__ == "__main__":
+            main()
+        """
+        )
+        g = nx.Graph()
+        node_num = 3
+        g.add_nodes_from(range(node_num))
+
+        ctrl = run_main(self.controller, code=code, graph_data=g)
+
+        target = RecorderEQ().start_init().add_record_and_back()
+
+        variable_adder = VariableAdder()
+
+        (
+            target.add_record()
+            .add_variables(
+                variable_adder.add_variable("main", "node_list", type="List")
+            )
+            .back()
+            .add_record()
+            .add_variables(variable_adder.add_variable("main", "node", type="Node"))
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.add_variable(
+                    "main",
+                    "ref",
+                    type="List",
+                    repr=Checker(
+                        is_type=List,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Node", "repr": "0"}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record()
+            .add_variables(
+                variable_adder.modify_variable(
+                    "main",
+                    "ref",
+                    type="List",
+                    repr=Checker(
+                        is_type=List,
+                        sequence_is=[
+                            Checker(contains_equal={"type": "Number", "repr": "1"}),
+                            Checker(contains_equal={"type": "Node", "repr": "0"}),
+                            Checker(contains_equal={"type": "Ref", "repr": None}),
+                        ],
+                    ),
+                )
+            )
+            .back()
+            .add_record_and_back(stdout="[1, 0, [...]]")
         )
 
         target.check(ctrl.recorder.final_change_list)
