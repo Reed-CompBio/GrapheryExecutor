@@ -152,7 +152,8 @@ class ExecutorWSGIServer(WSGIServer):
 
     def execute(self, config_bytes: bytes) -> List[Mapping]:
         command = self._subprocess_command
-        start_time = time.process_time()
+        start_cpu_time = time.process_time()
+        start_time = time.time()
         timeout = (
             self.settings[self.settings.EXEC_TIME_OUT]
             if self.settings.IS_LOCAL
@@ -182,8 +183,10 @@ class ExecutorWSGIServer(WSGIServer):
                 f"{stdout}\n" f"stderr: \n" f"{stderr}\n",
             )
         finally:
-            end_time = time.process_time()
-            self.logger.info(f"execution uses {end_time - start_time} seconds")
+            self.logger.info(f"execution time: {time.time() - start_time}")
+            self.logger.info(
+                f"execution uses CPU time {time.process_time() - start_cpu_time} seconds"
+            )
 
         if not stdout:
             self.logger.warning(f"got empty running result: {command}")
@@ -216,9 +219,18 @@ def run_server(settings: DefaultVars) -> None:
     logger.info(f"Server Ver: {SERVER_VERSION}. Press <ctrl+c> to stop the server.")
     logger.info(f"Ready for Python code on {host}:{port} ...")
 
-    with ExecutorWSGIServer(
-        server_address=(host, port), handler_cls=WSGIRequestHandler, settings=settings
-    ) as httpd:
-        logger.info("Server created...")
-        logger.info("Starting server...")
-        httpd.serve_forever()
+    try:
+        with ExecutorWSGIServer(
+            server_address=(host, port),
+            handler_cls=WSGIRequestHandler,
+            settings=settings,
+        ) as httpd:
+            logger.info("Server created...")
+            logger.info("Starting server...")
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Server stopped.")
+        return
+    except Exception as e:
+        logger.error(f"Server stopped with error. Error: {e}")
+        raise
