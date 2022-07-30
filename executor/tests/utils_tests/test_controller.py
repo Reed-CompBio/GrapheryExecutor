@@ -1,7 +1,6 @@
 import io
 import pathlib
 from contextlib import redirect_stdout
-from copy import deepcopy
 from logging import getLogger
 from operator import eq
 from textwrap import dedent
@@ -13,6 +12,7 @@ from platform import platform
 from ...settings import DefaultVars, SERVER_VERSION
 from ...settings.variables import NX_GRAPH_INJECTION_NAME, GRAPH_INJECTION_NAME
 from ...utils.controller import GraphController, ControllerResultAnnouncer
+from ...utils.graphology_helper import export_to_graphology
 
 _platform = platform()
 _settings = DefaultVars()
@@ -33,18 +33,45 @@ def make_test_controller_instance(
 
 class TestGraphController:
     def setup_class(self):
-        self.controller_cls: Type[GraphController] = deepcopy(GraphController)
+        class _GraphControllerCopy(GraphController):
+            pass
+
+        self.controller_cls: Type[GraphController] = _GraphControllerCopy
         self.controller_cls._graph_builder = dict
+
+        import networkx as nx
+
+        self.test_graph = nx.Graph()
+
+        self.graph_node_num = 10
+
+        for i in range(self.graph_node_num):
+            self.test_graph.add_node(i, x=i, y=i, size=15)
+
+        for i in range(1, self.graph_node_num - 1):
+            self.test_graph.add_edge(i - 1, i + 1, size=10)
 
     @pytest.mark.skip("not available for now")
     def test_resource_restriction(self):
         # TODO add linux resource test with signal
         pass
 
-    @pytest.mark.skip("not available for now")
     def test_graph_creation(self):
-        # TODO link with cyjs test
-        pass
+        controller = GraphController(
+            code="",
+            graph_data=export_to_graphology(self.test_graph),
+            target_version=SERVER_VERSION,
+            **{
+                DefaultVars.IS_LOCAL: True,
+            },
+        )
+        controller._build_graph()
+        assert len(self.test_graph.nodes) == len(controller._graph)
+        for node, data in self.test_graph.nodes(data=True):
+            assert controller._graph.nodes[node] == data
+
+        for *edge, data in self.test_graph.edges(data=True):
+            assert data.items() <= controller._graph.edges[edge].items()
 
     @pytest.mark.parametrize(
         "code, graph_data",
