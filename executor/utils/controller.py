@@ -506,7 +506,10 @@ class Controller(Generic[_T]):
                 else:
                     mod = self._BUILTIN_IMPORT(*args)
 
-            return self._sanitize_module(mod)
+            if not self.is_local:
+                mod = self._sanitize_module(mod)
+
+            return mod
 
         return __restricted_import__
 
@@ -606,7 +609,9 @@ class Controller(Generic[_T]):
         if len(aliases) < 1:
             raise ValueError("module should have at least a name")
 
-        module = self._sanitize_module(module)
+        if not self.is_local:
+            module = self._sanitize_module(module)
+
         for alias in aliases:
             self._custom_ns[alias] = module
         self._logger.debug(f"added module {module} under the name(s) {aliases}")
