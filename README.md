@@ -10,9 +10,9 @@ without restrictions.
 ## Get Started
 
 There are two ways to start the executor server, one through scripts and one through docker. The python minimal version
-is `3.10`.
+is `3.10`. Possible environmental variables can be found in the `.env-sample` file. The `export` command can be used to set them or use `.env` file in docker environments.
 
-### With python venv
+### With (pure) Python (venv)
 
 First, to install the executor,
 
@@ -33,30 +33,46 @@ To run the executor, use the following command
    ```shell
    source ./venv/bin/activate
    graphery_executor server
-   # press ctrl + c to exit 
+   # press ctrl + c to exit
    deactivate
    ```
-   
-### Get Started with Docker
+
+### With Poetry
+
+The poetry core minimal version required is now in beta, so you need use `poetry self update --preview` to update it.
+
+```shell
+poetry install
+poetry run graphery_executor server
+# press ctrl + c to exit
+```
+
+### With Docker
 
 To run through docker,
    ```shell
-   docker compose up --build 
+   docker compose up --build
    ```
-You can edit and copy `.env-example` to `.env` so that Docker can recognize environment variables without `export`. 
+You can edit and copy `.env-example` to `.env` so that Docker can recognize environment variables without `export`.
 
 ## Usage
+
+If you're using Graphery, simply use the web interface to run your code. It's still under development, but it should be public soon :)
+
+The rest of the examples are simple examples of how to use the executor, which is only relevant if you want to know how it works and how to use it. More details can be found in the [Graphery documentation](https://docs.graphery.reedcompbio.org/backend/executor/implementation/).
 
 For the following python code:
 
 ```python
-# `tracer`, `peek`, and `networkx` are injected 
-# so no importing is needed 
+# `tracer`, `peek`, and `networkx` are injected
+# so no importing is needed
 
-# Wanna to access the tutorial graph? 
+# Wanna to access the tutorial graph?
 # It's injected, too! just use `graph` in the code!
+from __future__ import annotations
 from networkx import Graph
 
+graph: Graph
 
 @peek
 def test_peek(a, b):
@@ -92,11 +108,11 @@ test_tracer(7, 9, 11)
 }
 ```
 
-in which the `version` field has to match the executor version to make the request acceptable. The option is detailed here (link coming soon). 
+in which the `version` field has to match the executor version to make the request acceptable. The option is detailed here (link coming soon).
 
-Note that the version in the example may not always be up to date. Please update the version to the corresponding server version. 
+Note that the version in the example may not always be up to date. Please update the version to the corresponding server version.
 
-Once the request is executed, the server will return a response like the following whose structure is detailed here (link coming soon). 
+Once the request is executed, the server will return a response like the following whose structure is detailed here (link coming soon).
 
 ```json
 {
@@ -239,4 +255,6 @@ Once the request is executed, the server will return a response like the followi
 }
 ```
 
-There is also a local executor that only receives a request from stdin and output the execution result to stdin and errors to stderr. Detail is listed here (link coming soon). 
+There is also a local executor that only receives a request from stdin and output the execution result to stdin and errors to stderr. The detail can also be found in the documentation above.
+
+Future work: in Graphery, we are aiming to explain algorithms in a more user-friendly way with small networks and concise code. The execution result above is fine but will be extremely redundant if more variables are involved or if the data structures become complicated. Heap will be a good way to avoid redundancy and increase readability, which becomes the future goal of API design.
